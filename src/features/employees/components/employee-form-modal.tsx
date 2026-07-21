@@ -113,12 +113,14 @@ export function EmployeeFormModal({
           onValueChange={handleTeamChange}
           options={teamOptions}
           placeholder="팀 선택"
+          disablePortal
         />
         <Select
           label="역할"
           value={role}
           onValueChange={(value) => setRole(value as UserRole)}
           options={ROLE_OPTIONS}
+          disablePortal
         />
 
         <div className="flex flex-col gap-1.5">
