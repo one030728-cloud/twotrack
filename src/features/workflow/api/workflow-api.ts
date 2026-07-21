@@ -1,5 +1,10 @@
 import type { ApprovalWorkflow, WorkflowKind } from "@/features/workflow/types";
 
+export async function fetchAllWorkflows(): Promise<ApprovalWorkflow[]> {
+  const res = await fetch("/api/workflows/all");
+  return res.json();
+}
+
 export async function fetchWorkflow(
   kind: WorkflowKind,
   entityId: number,

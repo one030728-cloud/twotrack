@@ -6,6 +6,7 @@ import {
   FileTextIcon,
   HardHatIcon,
   HashIcon,
+  HistoryIcon,
   ImagesIcon,
   LayoutDashboardIcon,
   MessageCircleIcon,
@@ -76,6 +77,7 @@ export const navItems: NavItem[] = [
     children: [
       { title: "용지 요청", icon: PenLineIcon, url: "/paper-orders" },
       { title: "직원 관리", icon: BookUserIcon, url: "/admin/users" },
+      { title: "활동로그", icon: HistoryIcon, url: "/activity-log" },
     ],
   },
 ];

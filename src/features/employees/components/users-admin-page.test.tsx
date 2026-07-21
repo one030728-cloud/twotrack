@@ -41,10 +41,30 @@ describe("UsersAdminPage", () => {
     await user.click(screen.getByRole("button", { name: "직원 추가" }));
     const modal = screen.getByRole("dialog", { name: "직원 추가" });
     await user.type(within(modal).getByLabelText("이름"), "신규 직원");
-    await user.type(within(modal).getByLabelText("팀"), "CS팀");
+    await user.click(within(modal).getByRole("combobox", { name: "팀" }));
+    await user.click(await screen.findByRole("option", { name: "CS" }));
     await user.click(within(modal).getByRole("button", { name: "추가" }));
 
     expect(await screen.findByText("신규 직원")).toBeInTheDocument();
+  });
+
+  it("개발팀을 선택하면 마스터 직책이 자동으로 부여되고 해제할 수 없다", async () => {
+    const user = userEvent.setup();
+    render(<UsersAdminPage />);
+    await screen.findByText("정지은 매니저");
+
+    await user.click(screen.getByRole("button", { name: "직원 추가" }));
+    const modal = screen.getByRole("dialog", { name: "직원 추가" });
+    await user.type(within(modal).getByLabelText("이름"), "개발자");
+    await user.click(within(modal).getByRole("combobox", { name: "팀" }));
+    await user.click(await screen.findByRole("option", { name: "개발팀" }));
+
+    const masterCheckbox = within(modal).getByLabelText("마스터");
+    expect(masterCheckbox).toBeChecked();
+    expect(masterCheckbox).toBeDisabled();
+
+    await user.click(within(modal).getByRole("button", { name: "추가" }));
+    expect(await screen.findByText("개발자")).toBeInTheDocument();
   });
 
   it("권한 변경 모달에서 직책을 바꾸면 목록에 반영된다", async () => {

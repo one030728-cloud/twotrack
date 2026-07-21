@@ -70,17 +70,25 @@ describe("AppSidebar", () => {
     ).toBeInTheDocument();
   });
 
-  it("CS 권한에서는 기술지원과 관리 메뉴를 숨긴다", () => {
+  it("CS 권한에서도 팀 구분 없이 모든 업무 메뉴가 보인다", () => {
     vi.mocked(usePathname).mockReturnValue("/");
     mockRole("cs");
     render(<AppSidebar />);
 
     expect(screen.getByRole("link", { name: "가맹 접수" })).toBeInTheDocument();
-    expect(
-      screen.queryByRole("link", { name: "설치 관리" }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "설치 관리" })).toBeInTheDocument();
+  });
+
+  it("master 직책이 없으면 관리 전용 메뉴(직원 관리, 활동로그)는 숨긴다", () => {
+    vi.mocked(usePathname).mockReturnValue("/");
+    mockRole("cs");
+    render(<AppSidebar />);
+
     expect(
       screen.queryByRole("link", { name: "직원 관리" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "활동로그" }),
     ).not.toBeInTheDocument();
   });
 });

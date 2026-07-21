@@ -14,6 +14,12 @@ export type PositionCode =
   | "team_lead"
   | "master";
 
+/** 직원 등록 시 선택 가능한 팀 목록. 개발팀은 마스터 직책 보유가 전제된다. */
+export const TEAM_OPTIONS = ["영업", "CS", "기술지원", "개발팀"] as const;
+export type TeamOption = (typeof TEAM_OPTIONS)[number];
+/** 개발팀 소속은 마스터 직책이 자동으로 부여된다. */
+export const MASTER_REQUIRED_TEAM: TeamOption = "개발팀";
+
 export const POSITION_OPTIONS: { value: PositionCode; label: string }[] = [
   { value: "cs_manager", label: "CS 매니저" },
   { value: "cs_responsible", label: "CS 책임매니저" },
@@ -33,8 +39,10 @@ export interface AuthUser {
   active: boolean;
 }
 
-const CS_PATHS = ["/franchise-receipts", "/changes", "/woo", "/internet"];
-const TECH_PATHS = ["/installs", "/stores"];
+/** master 직책만 접근 가능한 경로. 일반 admin 역할이라도 master 직책이 없으면 접근할 수 없다. */
+const MASTER_ONLY_PATHS = ["/activity-log"];
+/** admin 역할 또는 master 직책만 접근 가능한 경로. */
+const ADMIN_ONLY_PATHS = ["/admin/users"];
 
 function matchesAny(pathname: string, paths: string[]) {
   return paths.some(
@@ -49,15 +57,14 @@ export function canAccessPath(
 ): boolean {
   if (pathname === "/login") return true;
   if (pathname === "/") return true;
-  if (role === "admin") return true;
-  if (positions.includes("master")) return true;
-  const crossTeam = positions.includes("team_lead");
-  if (role === "viewer" || crossTeam) {
-    return matchesAny(pathname, [...CS_PATHS, ...TECH_PATHS]);
+  if (matchesAny(pathname, MASTER_ONLY_PATHS)) {
+    return positions.includes("master");
   }
-  if (role === "cs") return matchesAny(pathname, CS_PATHS);
-  if (role === "tech") return matchesAny(pathname, TECH_PATHS);
-  return false;
+  if (matchesAny(pathname, ADMIN_ONLY_PATHS)) {
+    return role === "admin" || positions.includes("master");
+  }
+  // 팀 구분 없이 로그인한 모든 사용자가 나머지 탭에 접근할 수 있다.
+  return true;
 }
 
 export function roleLabel(role: UserRole) {

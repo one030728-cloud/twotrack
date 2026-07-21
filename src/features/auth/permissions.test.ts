@@ -8,33 +8,33 @@ describe("canAccessPath", () => {
     expect(canAccessPath("admin", "/franchise-receipts")).toBe(true);
   });
 
-  it("cs는 CS 업무 경로만 접근한다", () => {
+  it("cs/tech/viewer 역할도 팀 구분 없이 모든 업무 경로에 접근한다", () => {
+    expect(canAccessPath("cs", "/installs")).toBe(true);
     expect(canAccessPath("cs", "/franchise-receipts")).toBe(true);
-    expect(canAccessPath("cs", "/changes")).toBe(true);
-    expect(canAccessPath("cs", "/installs")).toBe(false);
-    expect(canAccessPath("cs", "/admin/users")).toBe(false);
-  });
-
-  it("tech는 기술지원 경로만 접근한다", () => {
+    expect(canAccessPath("tech", "/franchise-receipts")).toBe(true);
     expect(canAccessPath("tech", "/installs")).toBe(true);
-    expect(canAccessPath("tech", "/stores")).toBe(true);
-    expect(canAccessPath("tech", "/franchise-receipts")).toBe(false);
+    expect(canAccessPath("viewer", "/installs")).toBe(true);
+    expect(canAccessPath("viewer", "/franchise-receipts")).toBe(true);
   });
 
-  it("team_lead 직책을 가진 cs 계정은 기술지원 경로에도 접근한다", () => {
-    expect(canAccessPath("cs", "/installs", ["team_lead"])).toBe(true);
-    expect(canAccessPath("cs", "/franchise-receipts", ["team_lead"])).toBe(
-      true,
-    );
+  it("/admin/users는 admin 역할 또는 master 직책만 접근한다", () => {
+    expect(canAccessPath("cs", "/admin/users")).toBe(false);
+    expect(canAccessPath("tech", "/admin/users")).toBe(false);
+    expect(canAccessPath("viewer", "/admin/users")).toBe(false);
+    expect(canAccessPath("admin", "/admin/users")).toBe(true);
+    expect(canAccessPath("viewer", "/admin/users", ["master"])).toBe(true);
   });
 
-  it("master 직책은 역할과 무관하게 모든 경로에 접근한다", () => {
+  it("/activity-log는 master 직책만 접근한다 (admin 역할이어도 예외 없음)", () => {
+    expect(canAccessPath("admin", "/activity-log")).toBe(false);
+    expect(canAccessPath("cs", "/activity-log")).toBe(false);
+    expect(canAccessPath("viewer", "/activity-log", ["master"])).toBe(true);
+    expect(canAccessPath("cs", "/activity-log", ["master"])).toBe(true);
+  });
+
+  it("master 직책은 관리자 전용 경로에도 접근한다", () => {
     expect(canAccessPath("viewer", "/admin/users", ["master"])).toBe(true);
     expect(canAccessPath("viewer", "/installs", ["master"])).toBe(true);
-  });
-
-  it("직책이 없으면 기존 역할 기준 접근만 허용된다", () => {
-    expect(canAccessPath("cs", "/installs", ["cs_manager"])).toBe(false);
   });
 });
 

@@ -8,7 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  MASTER_REQUIRED_TEAM,
   POSITION_OPTIONS,
+  TEAM_OPTIONS,
   roleLabel,
   type AuthUser,
   type PositionCode,
@@ -51,7 +53,29 @@ export function EmployeeFormModal({
   );
   const [active, setActive] = useState(initial?.active ?? true);
 
+  const isMasterRequiredTeam = team === MASTER_REQUIRED_TEAM;
+
+  const teamOptions: { value: string; label: string }[] = TEAM_OPTIONS.map(
+    (value) => ({ value, label: value }),
+  );
+  if (
+    initial?.team &&
+    !(TEAM_OPTIONS as readonly string[]).includes(initial.team)
+  ) {
+    teamOptions.unshift({ value: initial.team, label: initial.team });
+  }
+
+  const handleTeamChange = (value: string) => {
+    setTeam(value);
+    if (value === MASTER_REQUIRED_TEAM) {
+      setPositions((prev) =>
+        prev.includes("master") ? prev : [...prev, "master"],
+      );
+    }
+  };
+
   const togglePosition = (position: PositionCode) => {
+    if (isMasterRequiredTeam && position === "master") return;
     setPositions((prev) =>
       prev.includes(position)
         ? prev.filter((p) => p !== position)
@@ -83,10 +107,12 @@ export function EmployeeFormModal({
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
-        <Input
+        <Select
           label="팀"
-          value={team}
-          onChange={(e) => setTeam(e.target.value)}
+          value={team || null}
+          onValueChange={handleTeamChange}
+          options={teamOptions}
+          placeholder="팀 선택"
         />
         <Select
           label="역할"
@@ -105,10 +131,16 @@ export function EmployeeFormModal({
                 key={option.value}
                 label={option.label}
                 checked={positions.includes(option.value)}
+                disabled={isMasterRequiredTeam && option.value === "master"}
                 onChange={() => togglePosition(option.value)}
               />
             ))}
           </div>
+          {isMasterRequiredTeam && (
+            <span className="text-muted-foreground text-xs">
+              개발팀은 마스터 직책이 자동으로 부여됩니다.
+            </span>
+          )}
         </div>
 
         <Checkbox
