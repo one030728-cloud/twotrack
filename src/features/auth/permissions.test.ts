@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canAccessPath } from "./permissions";
+import { canAccessPath, positionLabel } from "./permissions";
 
 describe("canAccessPath", () => {
   it("admin은 모든 앱 경로에 접근한다", () => {
@@ -19,5 +19,13 @@ describe("canAccessPath", () => {
     expect(canAccessPath("tech", "/installs")).toBe(true);
     expect(canAccessPath("tech", "/stores")).toBe(true);
     expect(canAccessPath("tech", "/franchise-receipts")).toBe(false);
+  });
+});
+
+describe("positionLabel", () => {
+  it("직책 코드를 한글 라벨로 변환한다", () => {
+    expect(positionLabel("manager")).toBe("매니저");
+    expect(positionLabel("responsible_manager")).toBe("책임매니저");
+    expect(positionLabel("team_lead")).toBe("팀장");
   });
 });

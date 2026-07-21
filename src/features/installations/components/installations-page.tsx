@@ -46,6 +46,7 @@ export function InstallationsPage() {
     deleteSelected,
     updateField,
     addInstall,
+    refreshInstalls,
   } = useInstallations();
 
   const [newModalOpen, setNewModalOpen] = useState(false);
@@ -165,6 +166,7 @@ export function InstallationsPage() {
           record={detailRecord}
           onClose={() => setDetailId(null)}
           onUpdateField={updateField}
+          onWorkflowSettled={refreshInstalls}
         />
       )}
 

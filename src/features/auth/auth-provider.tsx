@@ -12,15 +12,15 @@ import {
   MOCK_USERS,
   canAccessPath,
   type AuthUser,
-  type UserRole,
 } from "@/features/auth/permissions";
 
-const STORAGE_KEY = "posmos-auth-user";
+export const AUTH_STORAGE_KEY = "posmos-auth-user";
+const STORAGE_KEY = AUTH_STORAGE_KEY;
 
 interface AuthContextValue {
   ready: boolean;
   user: AuthUser | null;
-  login: (role: UserRole) => void;
+  login: (userId: string) => void;
   logout: () => void;
   canAccess: (pathname: string) => boolean;
 }
@@ -51,9 +51,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       ready,
       user,
-      login(role) {
+      login(userId) {
         const nextUser = MOCK_USERS.find(
-          (candidate) => candidate.role === role,
+          (candidate) => candidate.id === userId,
         );
         if (!nextUser) return;
         window.localStorage.setItem(STORAGE_KEY, nextUser.id);

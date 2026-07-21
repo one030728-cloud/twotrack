@@ -3,7 +3,12 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SnackbarProvider } from "@/components/ui/snackbar";
 import { FranchiseReceiptsPage } from "./franchise-receipts-page";
-import { resetInstallsForTest, resetReceiptsForTest } from "@/mocks/handlers";
+import {
+  resetInstallsForTest,
+  resetReceiptsForTest,
+  resetWorkflowsForTest,
+} from "@/mocks/handlers";
+import { AUTH_STORAGE_KEY, AuthProvider } from "@/features/auth/auth-provider";
 
 // jsdom은 HTMLDialogElement의 showModal/close를 구현하지 않으므로
 // 모달/드로어가 뜨는 테스트를 위해 최소 폴리필을 등록한다.
@@ -27,15 +32,19 @@ beforeEach(() => {
 afterEach(() => {
   resetReceiptsForTest();
   resetInstallsForTest();
+  resetWorkflowsForTest();
+  window.localStorage.removeItem(AUTH_STORAGE_KEY);
   vi.useRealTimers();
 });
 
 describe("FranchiseReceiptsPage", () => {
   function renderPage() {
     render(
-      <SnackbarProvider>
-        <FranchiseReceiptsPage />
-      </SnackbarProvider>,
+      <AuthProvider>
+        <SnackbarProvider>
+          <FranchiseReceiptsPage />
+        </SnackbarProvider>
+      </AuthProvider>,
     );
   }
 
@@ -72,19 +81,26 @@ describe("FranchiseReceiptsPage", () => {
     expect(within(drawer).getByLabelText("상품")).toBeInTheDocument();
   });
 
-  it("상세 드로어에서 기술지원 이관을 실행하면 이관 완료 상태로 바뀐다", async () => {
+  it("매니저가 이관을 요청하면 요청 이력이 남고 요청 버튼이 사라진다", async () => {
+    window.localStorage.setItem(AUTH_STORAGE_KEY, "cs-manager");
     const user = userEvent.setup();
     renderPage();
     await user.click(await screen.findByText("카페 아모르"));
 
     const drawer = screen.getByRole("dialog", { name: "카페 아모르" });
-    await user.click(
-      within(drawer).getByRole("button", { name: "기술지원 이관" }),
-    );
+    await user.click(within(drawer).getByRole("button", { name: "이관 요청" }));
 
     expect(
-      await within(drawer).findByRole("button", { name: "이관 완료" }),
-    ).toBeDisabled();
+      await within(drawer).findByText(
+        (_, element) =>
+          element?.tagName.toLowerCase() === "li" &&
+          !!element.textContent?.includes("정지은 매니저") &&
+          !!element.textContent?.includes("승인 요청"),
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(drawer).queryByRole("button", { name: "이관 요청" }),
+    ).not.toBeInTheDocument();
   });
 
   it("로딩 후 KPI와 목록을 표시한다", async () => {

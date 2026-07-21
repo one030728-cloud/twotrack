@@ -28,26 +28,24 @@ import {
   statusOptionsForKind,
   type InstallRecord,
   type InstallStatus,
+  type PendingCompletion,
   type WorkOrderAttachment,
   type WorkOrderDevicePlan,
   type WorkOrderDeviceResult,
 } from "@/features/installations/types";
+import { ApprovalWorkflowPanel } from "@/features/workflow/components/approval-workflow-panel";
+import { useApprovalWorkflow } from "@/features/workflow/hooks/use-approval-workflow";
 
 interface InstallDetailDrawerProps {
   record: InstallRecord;
   onClose: () => void;
   onUpdateField: (id: number, patch: Partial<InstallRecord>) => void;
+  onWorkflowSettled: () => void;
 }
 
 const SOURCE_LABEL: Record<InstallRecord["source"], string> = {
   franchise: "가맹접수 연동",
   manual: "직접 등록",
-};
-
-const COMPLETED_STATUS_BY_KIND: Record<InstallRecord["kind"], InstallStatus> = {
-  install: "installDone",
-  parcel: "received",
-  as: "asDone",
 };
 
 const ATTACHMENT_TYPE_LABEL: Record<WorkOrderAttachment["type"], string> = {
@@ -84,8 +82,25 @@ export function InstallDetailDrawer({
   record,
   onClose,
   onUpdateField,
+  onWorkflowSettled,
 }: InstallDetailDrawerProps) {
   const titleId = useId();
+  const {
+    workflow,
+    loading: workflowLoading,
+    canRequest,
+    canApproveResponsible,
+    canApproveTeamLead,
+    canReject,
+    request,
+    approve,
+    reject,
+  } = useApprovalWorkflow("install_completion", record.id);
+
+  const handleApprove = async (comment?: string) => {
+    const updated = await approve(comment);
+    if (updated?.stage === "team_lead_approved") onWorkflowSettled();
+  };
   const colors = INSTALL_STATUS_COLORS[record.status];
   const showSchedule = record.kind === "install" || record.kind === "as";
   const showTracking = record.kind === "parcel";
@@ -141,11 +156,14 @@ export function InstallDetailDrawer({
     setBlueprintName("");
   };
 
-  const completeWorkOrder = (patch: Partial<InstallRecord>) => {
+  const requestCompletion = (pending: PendingCompletion, notiLabel: string) => {
     onUpdateField(record.id, {
-      ...patch,
-      status: COMPLETED_STATUS_BY_KIND[record.kind],
+      notiHistory: [
+        ...record.notiHistory,
+        { id: `noti-${record.id}-${Date.now()}`, label: notiLabel },
+      ],
     });
+    request(pending);
     setCompletionOpen(false);
   };
 
@@ -475,14 +493,31 @@ export function InstallDetailDrawer({
                   완료 시 실제 사용 기기, 회수 기기, 완료사진, 결과 메모를
                   확정하고 매장 이력 mock에 반영합니다.
                 </p>
-                <Button
-                  variant="primary"
-                  className="mt-3"
-                  onClick={() => setCompletionOpen(true)}
-                >
-                  <UploadIcon className="size-3.5" />
-                  완료 처리
-                </Button>
+                {canRequest && (
+                  <Button
+                    variant="primary"
+                    className="mt-3"
+                    onClick={() => setCompletionOpen(true)}
+                  >
+                    <UploadIcon className="size-3.5" />
+                    완료 처리 요청
+                  </Button>
+                )}
+                {workflow && (
+                  <div className="mt-3">
+                    <ApprovalWorkflowPanel
+                      workflow={workflow}
+                      loading={workflowLoading}
+                      canRequest={canRequest}
+                      canApproveResponsible={canApproveResponsible}
+                      canApproveTeamLead={canApproveTeamLead}
+                      canReject={canReject}
+                      requestLabel="완료 처리 요청"
+                      onApprove={handleApprove}
+                      onReject={reject}
+                    />
+                  </div>
+                )}
               </div>
             )}
           </Section>
@@ -533,7 +568,7 @@ export function InstallDetailDrawer({
           plannedDevices={plannedDevices}
           attachments={attachments}
           onClose={() => setCompletionOpen(false)}
-          onComplete={completeWorkOrder}
+          onComplete={requestCompletion}
         />
       )}
     </Dialog>
@@ -545,7 +580,7 @@ interface CompletionModalProps {
   plannedDevices: WorkOrderDevicePlan[];
   attachments: WorkOrderAttachment[];
   onClose: () => void;
-  onComplete: (patch: Partial<InstallRecord>) => void;
+  onComplete: (pending: PendingCompletion, notiLabel: string) => void;
 }
 
 function CompletionModal({
@@ -624,27 +659,16 @@ function CompletionModal({
         ? actualDevices.map((device) => device.serialNo).join(", ")
         : deviceMissingReason.trim();
 
-    onComplete({
-      completedAt: now,
-      resultMemo: resultMemo.trim(),
-      completionPhotoMissingReason: photoMissingReason.trim(),
-      deviceResults: [...actualDevices, ...removedDevice],
-      attachments: completionAttachments,
-      storeWorkHistory: [
-        ...(record.storeWorkHistory ?? []),
-        {
-          id: `history-${record.id}-${Date.now()}`,
-          label: `${now.slice(0, 10)} · ${INSTALL_KIND_META[record.kind].label} 완료 · ${deviceSummary}`,
-        },
-      ],
-      notiHistory: [
-        ...record.notiHistory,
-        {
-          id: `noti-${record.id}-${Date.now()}`,
-          label: `${now.slice(0, 10)} · 완료 처리 기록`,
-        },
-      ],
-    });
+    onComplete(
+      {
+        resultMemo: resultMemo.trim(),
+        completionPhotoMissingReason: photoMissingReason.trim(),
+        deviceResults: [...actualDevices, ...removedDevice],
+        attachments: completionAttachments,
+        historyLabel: `${now.slice(0, 10)} · ${INSTALL_KIND_META[record.kind].label} 완료 · ${deviceSummary}`,
+      },
+      `${now.slice(0, 10)} · 완료 처리 요청`,
+    );
   };
 
   return (
@@ -770,7 +794,7 @@ function CompletionModal({
       <div className="border-border flex justify-end gap-2 border-t px-6 py-4">
         <Button onClick={onClose}>취소</Button>
         <Button variant="primary" disabled={!canSubmit} onClick={handleSubmit}>
-          완료 처리
+          완료 처리 요청
         </Button>
       </div>
     </Dialog>

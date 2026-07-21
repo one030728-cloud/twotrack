@@ -30,7 +30,8 @@ import {
   type FranchiseReceipt,
   type ReceiptChannel,
 } from "@/features/franchise-receipts/types";
-import type { InstallRecord } from "@/features/installations/types";
+import { ApprovalWorkflowPanel } from "@/features/workflow/components/approval-workflow-panel";
+import { useApprovalWorkflow } from "@/features/workflow/hooks/use-approval-workflow";
 
 const CHANNEL_OPTIONS = RECEIPT_CHANNELS.map((c) => ({ value: c, label: c }));
 const BIZ_TYPE_OPTIONS = BIZ_TYPES.map((t) => ({ value: t, label: t }));
@@ -49,14 +50,14 @@ interface ReceiptDetailDrawerProps {
   receipt: FranchiseReceipt;
   onClose: () => void;
   onUpdateField: (id: number, patch: Partial<FranchiseReceipt>) => void;
-  onTransferToInstall: (id: number) => Promise<InstallRecord>;
+  onWorkflowSettled: () => void;
 }
 
 export function ReceiptDetailDrawer({
   receipt,
   onClose,
   onUpdateField,
-  onTransferToInstall,
+  onWorkflowSettled,
 }: ReceiptDetailDrawerProps) {
   const titleId = useId();
 
@@ -68,11 +69,22 @@ export function ReceiptDetailDrawer({
   const [addressDetail, setAddressDetail] = useState("");
   const [openDate, setOpenDate] = useState("");
   const [installDate, setInstallDate] = useState("");
-  const [transfering, setTransfering] = useState(false);
-  const alreadyTransferred =
-    receipt.status === "techWait" ||
-    receipt.status === "techDone" ||
-    receipt.status === "done";
+  const {
+    workflow,
+    loading: workflowLoading,
+    canRequest,
+    canApproveResponsible,
+    canApproveTeamLead,
+    canReject,
+    request,
+    approve,
+    reject,
+  } = useApprovalWorkflow("franchise_transfer", receipt.id);
+
+  const handleApprove = async (comment?: string) => {
+    const updated = await approve(comment);
+    if (updated?.stage === "team_lead_approved") onWorkflowSettled();
+  };
 
   const addProduct = () => {
     setProducts((prev) => [
@@ -89,16 +101,6 @@ export function ReceiptDetailDrawer({
     setVanSelected((prev) =>
       prev.includes(van) ? prev.filter((v) => v !== van) : [...prev, van],
     );
-  };
-
-  const transferToInstall = async () => {
-    if (transfering || alreadyTransferred) return;
-    setTransfering(true);
-    try {
-      await onTransferToInstall(receipt.id);
-    } finally {
-      setTransfering(false);
-    }
   };
 
   const colors = STATUS_COLORS[receipt.status];
@@ -366,6 +368,22 @@ export function ReceiptDetailDrawer({
               })}
             </div>
           </div>
+
+          <div>
+            <SectionTitle>기술지원 이관 승인</SectionTitle>
+            <ApprovalWorkflowPanel
+              workflow={workflow}
+              loading={workflowLoading}
+              canRequest={canRequest}
+              canApproveResponsible={canApproveResponsible}
+              canApproveTeamLead={canApproveTeamLead}
+              canReject={canReject}
+              requestLabel="이관 요청"
+              onRequest={() => request()}
+              onApprove={handleApprove}
+              onReject={reject}
+            />
+          </div>
         </div>
       </div>
 
@@ -387,22 +405,6 @@ export function ReceiptDetailDrawer({
           className="bg-surface-subtle"
         >
           서류안내 재발송
-        </Button>
-        <Button
-          variant="secondary"
-          disabled={transfering || alreadyTransferred}
-          title={
-            alreadyTransferred
-              ? "이미 설치관리로 이관된 접수입니다."
-              : "설치관리 작업을 생성합니다."
-          }
-          onClick={transferToInstall}
-        >
-          {alreadyTransferred
-            ? "이관 완료"
-            : transfering
-              ? "이관 중"
-              : "기술지원 이관"}
         </Button>
         <Button
           variant="primary"

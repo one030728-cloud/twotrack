@@ -152,6 +152,16 @@ export interface InstallRecord {
   resultMemo?: string;
   completedAt?: string | null;
   storeWorkHistory?: StoreWorkHistoryEntry[];
+  /** 완료요청 후 팀장 최종수락 전까지 보관되는 완료 처리 데이터 (승인 시 반영, 반려 시 폐기) */
+  pendingCompletion?: PendingCompletion | null;
+}
+
+export interface PendingCompletion {
+  resultMemo: string;
+  completionPhotoMissingReason: string;
+  deviceResults: WorkOrderDeviceResult[];
+  attachments: WorkOrderAttachment[];
+  historyLabel: string;
 }
 
 export type CreateInstallInput = Partial<

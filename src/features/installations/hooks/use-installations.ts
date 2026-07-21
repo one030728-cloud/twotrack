@@ -50,6 +50,12 @@ export function useInstallations() {
     };
   }, []);
 
+  /** 승인 워크플로우가 서버에서 설치 상태를 바꾼 뒤 목록을 다시 불러오기 위한 헬퍼. */
+  const refreshInstalls = useCallback(async () => {
+    const data = await fetchInstalls();
+    setInstalls(data);
+  }, []);
+
   const setKind = useCallback(
     (next: InstallKind) => {
       setKindState(next);
@@ -218,6 +224,7 @@ export function useInstallations() {
   }, [selectableInstalls, selected]);
 
   return {
+    refreshInstalls,
     loading,
     installs,
     kind,

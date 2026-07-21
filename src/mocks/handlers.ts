@@ -11,8 +11,17 @@ import {
 import type {
   CreateInstallInput,
   InstallRecord,
+  PendingCompletion,
 } from "@/features/installations/types";
 import { createInitialInstalls } from "@/features/installations/api/mock-data";
+import { MOCK_USERS, type PositionCode } from "@/features/auth/permissions";
+import {
+  domainForKind,
+  type ApprovalWorkflow,
+  type WorkflowActionEntry,
+  type WorkflowKind,
+  type WorkflowStage,
+} from "@/features/workflow/types";
 
 const initialNotifications: AppNotification[] = [
   {
@@ -82,6 +91,133 @@ export function resetInstallsForTest() {
   installs = createInitialInstalls();
 }
 
+let workflows: ApprovalWorkflow[] = [];
+
+/** 테스트에서 mock 데이터 상태를 시드 값으로 되돌리기 위한 헬퍼. 프로덕션 코드에서는 사용하지 않는다. */
+export function resetWorkflowsForTest() {
+  workflows = [];
+}
+
+/** 가맹 접수 건을 기술지원팀 설치관리로 이관하는 부수효과. 승인 워크플로우의 팀장 최종수락 시 호출된다. */
+function performFranchiseTransfer(id: number) {
+  const target = receipts.find((r) => r.id === id);
+  if (!target) return null;
+
+  const transferredReceipt: FranchiseReceipt = {
+    ...target,
+    status: "techWait",
+    stage: Math.max(target.stage, 2),
+    memoHistory: [
+      ...target.memoHistory,
+      {
+        id: `memo-${id}-transfer-${Date.now()}`,
+        meta: new Date().toISOString().slice(0, 10),
+        content: "기술지원 이관으로 설치관리 작업이 생성되었습니다.",
+        pinned: false,
+      },
+    ],
+  };
+  receipts = receipts.map((r) => (r.id === id ? transferredReceipt : r));
+
+  const existing = installs.find(
+    (install) =>
+      install.source === "franchise" && install.sourceReceiptId === id,
+  );
+  if (existing) {
+    return { receipt: transferredReceipt, install: existing };
+  }
+
+  const nextId = installs.reduce((max, r) => Math.max(max, r.id), 0) + 1;
+  const now = new Date().toISOString();
+  const created: InstallRecord = {
+    id: nextId,
+    kind: "install",
+    customerName: target.name,
+    phone: target.phone,
+    address: "",
+    addressDetail: "",
+    product: "",
+    status: "receipt",
+    assignedTech: null,
+    trackingNo: null,
+    scheduledDate: null,
+    timeSlot: null,
+    symptom: "",
+    registeredBy: "가맹접수 연동",
+    registeredAt: now,
+    source: "franchise",
+    sourceReceiptId: id,
+    memo: target.memo,
+    notiHistory: [
+      {
+        id: `noti-${nextId}-transfer`,
+        label: `${now.slice(0, 10)} · 가맹 접수에서 기술지원 이관`,
+      },
+    ],
+    requestMemo: target.memo,
+    planMemo: "",
+    plannedDevices: [],
+    deviceResults: [],
+    attachments: [],
+    completionPhotoMissingReason: "",
+    resultMemo: "",
+    completedAt: null,
+    storeWorkHistory: [],
+    pendingCompletion: null,
+  };
+  installs = [created, ...installs];
+
+  return { receipt: transferredReceipt, install: created };
+}
+
+/** 설치/AS 완료요청 시 보관해둔 pendingCompletion을 실제 완료 상태로 확정하는 부수효과. */
+function performInstallCompletion(id: number) {
+  const target = installs.find((r) => r.id === id);
+  if (!target || !target.pendingCompletion) return null;
+
+  const COMPLETED_STATUS: Record<
+    InstallRecord["kind"],
+    InstallRecord["status"]
+  > = {
+    install: "installDone",
+    parcel: "received",
+    as: "asDone",
+  };
+
+  const pending = target.pendingCompletion;
+  const now = new Date().toISOString();
+  const updated: InstallRecord = {
+    ...target,
+    status: COMPLETED_STATUS[target.kind],
+    completedAt: now,
+    resultMemo: pending.resultMemo,
+    completionPhotoMissingReason: pending.completionPhotoMissingReason,
+    deviceResults: pending.deviceResults,
+    attachments: pending.attachments,
+    storeWorkHistory: [
+      ...(target.storeWorkHistory ?? []),
+      { id: `history-${id}-${Date.now()}`, label: pending.historyLabel },
+    ],
+    pendingCompletion: null,
+  };
+  installs = installs.map((r) => (r.id === id ? updated : r));
+  return updated;
+}
+
+const REQUIRED_POSITION_BY_STAGE: Record<
+  "manager_requested" | "responsible_approved",
+  PositionCode
+> = {
+  manager_requested: "responsible_manager",
+  responsible_approved: "team_lead",
+};
+
+function findLatestWorkflow(kind: WorkflowKind, entityId: number) {
+  return workflows
+    .filter((w) => w.kind === kind && w.entityId === entityId)
+    .sort((a, b) => b.requestedAt.localeCompare(a.requestedAt))[0];
+}
+
 export const handlers = [
   http.get("/api/health", () => {
     return HttpResponse.json({ status: "ok" });
@@ -145,81 +281,11 @@ export const handlers = [
 
   http.post("/api/franchise-receipts/:id/transfer-install", ({ params }) => {
     const id = Number(params.id);
-    const target = receipts.find((r) => r.id === id);
-    if (!target) {
+    const result = performFranchiseTransfer(id);
+    if (!result) {
       return new HttpResponse(null, { status: 404 });
     }
-
-    const transferredReceipt: FranchiseReceipt = {
-      ...target,
-      status: "techWait",
-      stage: Math.max(target.stage, 2),
-      memoHistory: [
-        ...target.memoHistory,
-        {
-          id: `memo-${id}-transfer-${Date.now()}`,
-          meta: new Date().toISOString().slice(0, 10),
-          content: "기술지원 이관으로 설치관리 작업이 생성되었습니다.",
-          pinned: false,
-        },
-      ],
-    };
-    receipts = receipts.map((r) => (r.id === id ? transferredReceipt : r));
-
-    const existing = installs.find(
-      (install) =>
-        install.source === "franchise" && install.sourceReceiptId === id,
-    );
-    if (existing) {
-      return HttpResponse.json({
-        receipt: transferredReceipt,
-        install: existing,
-      });
-    }
-
-    const nextId = installs.reduce((max, r) => Math.max(max, r.id), 0) + 1;
-    const now = new Date().toISOString();
-    const created: InstallRecord = {
-      id: nextId,
-      kind: "install",
-      customerName: target.name,
-      phone: target.phone,
-      address: "",
-      addressDetail: "",
-      product: "",
-      status: "receipt",
-      assignedTech: null,
-      trackingNo: null,
-      scheduledDate: null,
-      timeSlot: null,
-      symptom: "",
-      registeredBy: "가맹접수 연동",
-      registeredAt: now,
-      source: "franchise",
-      sourceReceiptId: id,
-      memo: target.memo,
-      notiHistory: [
-        {
-          id: `noti-${nextId}-transfer`,
-          label: `${now.slice(0, 10)} · 가맹 접수에서 기술지원 이관`,
-        },
-      ],
-      requestMemo: target.memo,
-      planMemo: "",
-      plannedDevices: [],
-      deviceResults: [],
-      attachments: [],
-      completionPhotoMissingReason: "",
-      resultMemo: "",
-      completedAt: null,
-      storeWorkHistory: [],
-    };
-    installs = [created, ...installs];
-
-    return HttpResponse.json(
-      { receipt: transferredReceipt, install: created },
-      { status: 201 },
-    );
+    return HttpResponse.json(result, { status: 201 });
   }),
 
   http.patch("/api/franchise-receipts/:id", async ({ params, request }) => {
@@ -273,6 +339,7 @@ export const handlers = [
       resultMemo: "",
       completedAt: null,
       storeWorkHistory: [],
+      pendingCompletion: null,
     };
     installs = [created, ...installs];
     return HttpResponse.json(created, { status: 201 });
@@ -301,5 +368,181 @@ export const handlers = [
     }
     installs = installs.filter((r) => r.id !== id);
     return new HttpResponse(null, { status: 204 });
+  }),
+
+  http.get("/api/workflows", ({ request }) => {
+    const url = new URL(request.url);
+    const kind = url.searchParams.get("kind") as WorkflowKind | null;
+    const entityId = Number(url.searchParams.get("entityId"));
+    if (!kind || !entityId) {
+      return new HttpResponse(null, { status: 400 });
+    }
+    return HttpResponse.json(findLatestWorkflow(kind, entityId) ?? null);
+  }),
+
+  http.post("/api/workflows", async ({ request }) => {
+    const body = (await request.json()) as {
+      kind: WorkflowKind;
+      entityId: number;
+      actorId: string;
+      payload?: PendingCompletion;
+    };
+    const actor = MOCK_USERS.find((u) => u.id === body.actorId);
+    const domain = domainForKind(body.kind);
+    if (
+      !actor ||
+      actor.role !== domain ||
+      !actor.positions.includes("manager")
+    ) {
+      return new HttpResponse(null, { status: 403 });
+    }
+    const existing = findLatestWorkflow(body.kind, body.entityId);
+    if (existing && existing.stage !== "rejected") {
+      return HttpResponse.json(existing);
+    }
+
+    if (body.kind === "install_completion" && body.payload) {
+      installs = installs.map((r) =>
+        r.id === body.entityId
+          ? { ...r, pendingCompletion: body.payload ?? null }
+          : r,
+      );
+    }
+
+    const now = new Date().toISOString();
+    const entry: WorkflowActionEntry = {
+      id: `wf-action-${Date.now()}`,
+      action: "request",
+      actorId: actor.id,
+      actorName: actor.name,
+      actorPosition: "manager",
+      comment: "",
+      createdAt: now,
+    };
+    const created: ApprovalWorkflow = {
+      id: `wf-${Date.now()}`,
+      kind: body.kind,
+      domain,
+      entityId: body.entityId,
+      stage: "manager_requested",
+      requestedBy: actor.id,
+      requestedByName: actor.name,
+      requestedAt: now,
+      history: [entry],
+    };
+    workflows = [created, ...workflows];
+    return HttpResponse.json(created, { status: 201 });
+  }),
+
+  http.post("/api/workflows/:id/approve", async ({ params, request }) => {
+    const id = params.id as string;
+    const workflow = workflows.find((w) => w.id === id);
+    if (!workflow) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    const body = (await request.json()) as {
+      actorId: string;
+      comment?: string;
+    };
+    const actor = MOCK_USERS.find((u) => u.id === body.actorId);
+    const requiredPosition =
+      REQUIRED_POSITION_BY_STAGE[
+        workflow.stage as "manager_requested" | "responsible_approved"
+      ];
+    if (
+      !actor ||
+      !requiredPosition ||
+      actor.role !== workflow.domain ||
+      !actor.positions.includes(requiredPosition) ||
+      actor.id === workflow.requestedBy
+    ) {
+      return new HttpResponse(null, { status: 403 });
+    }
+
+    const nextStage: WorkflowStage =
+      workflow.stage === "manager_requested"
+        ? "responsible_approved"
+        : "team_lead_approved";
+    const now = new Date().toISOString();
+    const entry: WorkflowActionEntry = {
+      id: `wf-action-${Date.now()}`,
+      action:
+        workflow.stage === "manager_requested"
+          ? "responsible_approve"
+          : "team_lead_approve",
+      actorId: actor.id,
+      actorName: actor.name,
+      actorPosition: requiredPosition,
+      comment: body.comment ?? "",
+      createdAt: now,
+    };
+    const updated: ApprovalWorkflow = {
+      ...workflow,
+      stage: nextStage,
+      history: [...workflow.history, entry],
+    };
+    workflows = workflows.map((w) => (w.id === id ? updated : w));
+
+    if (nextStage === "team_lead_approved") {
+      if (workflow.kind === "franchise_transfer") {
+        performFranchiseTransfer(workflow.entityId);
+      } else {
+        performInstallCompletion(workflow.entityId);
+      }
+    }
+
+    return HttpResponse.json(updated);
+  }),
+
+  http.post("/api/workflows/:id/reject", async ({ params, request }) => {
+    const id = params.id as string;
+    const workflow = workflows.find((w) => w.id === id);
+    if (!workflow) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    const body = (await request.json()) as {
+      actorId: string;
+      reason: string;
+    };
+    const actor = MOCK_USERS.find((u) => u.id === body.actorId);
+    const requiredPosition =
+      REQUIRED_POSITION_BY_STAGE[
+        workflow.stage as "manager_requested" | "responsible_approved"
+      ];
+    if (
+      !actor ||
+      !requiredPosition ||
+      actor.role !== workflow.domain ||
+      !actor.positions.includes(requiredPosition) ||
+      actor.id === workflow.requestedBy ||
+      !body.reason?.trim()
+    ) {
+      return new HttpResponse(null, { status: 403 });
+    }
+
+    const now = new Date().toISOString();
+    const entry: WorkflowActionEntry = {
+      id: `wf-action-${Date.now()}`,
+      action: "reject",
+      actorId: actor.id,
+      actorName: actor.name,
+      actorPosition: requiredPosition,
+      comment: body.reason,
+      createdAt: now,
+    };
+    const updated: ApprovalWorkflow = {
+      ...workflow,
+      stage: "rejected",
+      history: [...workflow.history, entry],
+    };
+    workflows = workflows.map((w) => (w.id === id ? updated : w));
+
+    if (workflow.kind === "install_completion") {
+      installs = installs.map((r) =>
+        r.id === workflow.entityId ? { ...r, pendingCompletion: null } : r,
+      );
+    }
+
+    return HttpResponse.json(updated);
   }),
 ];

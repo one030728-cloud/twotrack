@@ -3,12 +3,12 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { LogInIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { LogoMark } from "@/components/layout/logo-mark";
 import { useAuth } from "@/features/auth/auth-provider";
 import {
   MOCK_USERS,
   roleLabel,
+  positionLabel,
   type UserRole,
 } from "@/features/auth/permissions";
 
@@ -27,8 +27,8 @@ export function LoginPage() {
     if (ready && user) router.replace("/");
   }, [ready, router, user]);
 
-  const handleLogin = (role: UserRole) => {
-    login(role);
+  const handleLogin = (userId: string) => {
+    login(userId);
     router.replace("/");
   };
 
@@ -42,14 +42,14 @@ export function LoginPage() {
         <section className="border-border bg-card shadow-card rounded-lg border p-6">
           <h1 className="text-foreground text-xl font-bold">로그인</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            테스트할 역할을 선택해 전산 시스템에 접속합니다.
+            테스트할 계정을 선택해 전산 시스템에 접속합니다.
           </p>
           <div className="mt-5 flex flex-col gap-2">
             {MOCK_USERS.map((mockUser) => (
               <button
                 key={mockUser.id}
                 type="button"
-                onClick={() => handleLogin(mockUser.role)}
+                onClick={() => handleLogin(mockUser.id)}
                 className="border-border hover:border-primary/50 hover:bg-surface-subtle flex items-center justify-between gap-4 rounded-lg border px-4 py-3 text-left"
               >
                 <span>
@@ -58,6 +58,9 @@ export function LoginPage() {
                   </span>
                   <span className="text-muted-foreground mt-1 block text-xs">
                     {mockUser.team} · {roleLabel(mockUser.role)}
+                    {mockUser.positions.length > 0
+                      ? ` · ${mockUser.positions.map(positionLabel).join(", ")}`
+                      : ""}
                   </span>
                   <span className="text-muted-foreground mt-1 block text-xs">
                     {ROLE_DESCRIPTION[mockUser.role]}
@@ -67,13 +70,6 @@ export function LoginPage() {
               </button>
             ))}
           </div>
-          <Button
-            variant="secondary"
-            className="mt-5 w-full"
-            onClick={() => handleLogin("cs")}
-          >
-            CS 계정으로 로그인
-          </Button>
         </section>
       </div>
     </main>

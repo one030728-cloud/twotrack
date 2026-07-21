@@ -124,7 +124,7 @@ export function FranchiseReceiptsPage() {
     selectAllFiltered,
     updateField,
     addReceipt,
-    transferToInstall,
+    refreshReceipts,
   } = useFranchiseReceipts();
 
   const [newModalOpen, setNewModalOpen] = useState(false);
@@ -265,7 +265,7 @@ export function FranchiseReceiptsPage() {
           receipt={detailReceipt}
           onClose={() => setDetailReceiptId(null)}
           onUpdateField={updateField}
-          onTransferToInstall={transferToInstall}
+          onWorkflowSettled={refreshReceipts}
         />
       )}
 

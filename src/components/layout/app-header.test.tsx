@@ -20,7 +20,13 @@ afterEach(() => resetNotificationsForTest());
 function renderHeader(auth = {}) {
   vi.mocked(useAuth).mockReturnValue({
     ready: true,
-    user: { id: "cs", name: "서지은 팀장", team: "CS팀", role: "cs" },
+    user: {
+      id: "cs",
+      name: "서지은 팀장",
+      team: "CS팀",
+      role: "cs",
+      positions: [],
+    },
     login: vi.fn(),
     logout: vi.fn(),
     canAccess: (pathname: string) =>

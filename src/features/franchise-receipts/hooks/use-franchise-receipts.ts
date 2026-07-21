@@ -5,7 +5,6 @@ import {
   createReceipt,
   fetchReceiptKpis,
   fetchReceipts,
-  transferReceiptToInstall,
   updateReceipt,
 } from "@/features/franchise-receipts/api/franchise-receipts-api";
 import type { DateRangeValue } from "@/components/ui/date-range-picker";
@@ -59,6 +58,13 @@ export function useFranchiseReceipts() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  /** 승인 워크플로우가 서버에서 접수 상태를 바꾼 뒤 목록을 다시 불러오기 위한 헬퍼. */
+  const refreshReceipts = useCallback(async () => {
+    const [r, k] = await Promise.all([fetchReceipts(), fetchReceiptKpis()]);
+    setReceipts(r);
+    setKpis(k);
   }, []);
 
   const setActiveTab = useCallback((tab: ReceiptTabKey) => {
@@ -224,17 +230,8 @@ export function useFranchiseReceipts() {
     return created;
   }, []);
 
-  const transferToInstall = useCallback(async (id: number) => {
-    const result = await transferReceiptToInstall(id);
-    setReceipts((prev) =>
-      prev.map((receipt) =>
-        receipt.id === result.receipt.id ? result.receipt : receipt,
-      ),
-    );
-    return result.install;
-  }, []);
-
   return {
+    refreshReceipts,
     loading,
     kpis,
     receipts,
@@ -271,6 +268,5 @@ export function useFranchiseReceipts() {
     selectAllFiltered,
     updateField,
     addReceipt,
-    transferToInstall,
   };
 }

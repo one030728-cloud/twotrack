@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { resetInstallsForTest, resetReceiptsForTest } from "./handlers";
+import {
+  resetInstallsForTest,
+  resetReceiptsForTest,
+  resetWorkflowsForTest,
+} from "./handlers";
 import type { FranchiseReceipt } from "@/features/franchise-receipts/types";
 import type { InstallRecord } from "@/features/installations/types";
+import type { ApprovalWorkflow } from "@/features/workflow/types";
 
 describe("MSW handlers", () => {
   it("intercepts GET /api/health", async () => {
@@ -206,5 +211,124 @@ describe("install handlers", () => {
       method: "DELETE",
     });
     expect(missingDelete.status).toBe(404);
+  });
+});
+
+describe("승인 워크플로우 handlers", () => {
+  afterEach(() => {
+    resetReceiptsForTest();
+    resetInstallsForTest();
+    resetWorkflowsForTest();
+  });
+
+  it("매니저→책임매니저→팀장 순서로 승인하면 이관이 완료된다", async () => {
+    const requestRes = await fetch("/api/workflows", {
+      method: "POST",
+      body: JSON.stringify({
+        kind: "franchise_transfer",
+        entityId: 1,
+        actorId: "cs-manager",
+      }),
+    });
+    expect(requestRes.status).toBe(201);
+    const created = (await requestRes.json()) as ApprovalWorkflow;
+    expect(created.stage).toBe("manager_requested");
+
+    const approve1 = await fetch(`/api/workflows/${created.id}/approve`, {
+      method: "POST",
+      body: JSON.stringify({ actorId: "cs-responsible" }),
+    });
+    expect(approve1.status).toBe(200);
+    const afterResponsible = (await approve1.json()) as ApprovalWorkflow;
+    expect(afterResponsible.stage).toBe("responsible_approved");
+
+    const approve2 = await fetch(`/api/workflows/${created.id}/approve`, {
+      method: "POST",
+      body: JSON.stringify({ actorId: "cs-lead" }),
+    });
+    expect(approve2.status).toBe(200);
+    const final = (await approve2.json()) as ApprovalWorkflow;
+    expect(final.stage).toBe("team_lead_approved");
+
+    const receiptRes = await fetch("/api/franchise-receipts");
+    const receipts = (await receiptRes.json()) as FranchiseReceipt[];
+    const receipt = receipts.find((r) => r.id === 1);
+    expect(receipt?.status).toBe("techWait");
+
+    const installRes = await fetch("/api/installs");
+    const installs = (await installRes.json()) as InstallRecord[];
+    expect(
+      installs.some((i) => i.source === "franchise" && i.sourceReceiptId === 1),
+    ).toBe(true);
+  });
+
+  it("본인이 요청한 건은 본인이 승인할 수 없다", async () => {
+    const requestRes = await fetch("/api/workflows", {
+      method: "POST",
+      body: JSON.stringify({
+        kind: "franchise_transfer",
+        entityId: 2,
+        actorId: "cs-manager",
+      }),
+    });
+    const created = (await requestRes.json()) as ApprovalWorkflow;
+
+    const selfApprove = await fetch(`/api/workflows/${created.id}/approve`, {
+      method: "POST",
+      body: JSON.stringify({ actorId: "cs-manager" }),
+    });
+    expect(selfApprove.status).toBe(403);
+  });
+
+  it("다른 팀(도메인) 직책 보유자는 승인할 수 없다", async () => {
+    const requestRes = await fetch("/api/workflows", {
+      method: "POST",
+      body: JSON.stringify({
+        kind: "franchise_transfer",
+        entityId: 3,
+        actorId: "cs-manager",
+      }),
+    });
+    const created = (await requestRes.json()) as ApprovalWorkflow;
+
+    const wrongPosition = await fetch(`/api/workflows/${created.id}/approve`, {
+      method: "POST",
+      body: JSON.stringify({ actorId: "tech-responsible" }),
+    });
+    expect(wrongPosition.status).toBe(403);
+  });
+
+  it("반려 시 사유와 함께 이력이 남고, 재요청 시 새 워크플로우가 만들어진다", async () => {
+    const requestRes = await fetch("/api/workflows", {
+      method: "POST",
+      body: JSON.stringify({
+        kind: "franchise_transfer",
+        entityId: 4,
+        actorId: "cs-manager",
+      }),
+    });
+    const created = (await requestRes.json()) as ApprovalWorkflow;
+
+    const rejectRes = await fetch(`/api/workflows/${created.id}/reject`, {
+      method: "POST",
+      body: JSON.stringify({ actorId: "cs-responsible", reason: "서류 누락" }),
+    });
+    expect(rejectRes.status).toBe(200);
+    const rejected = (await rejectRes.json()) as ApprovalWorkflow;
+    expect(rejected.stage).toBe("rejected");
+    expect(rejected.history.at(-1)?.comment).toBe("서류 누락");
+
+    const reRequestRes = await fetch("/api/workflows", {
+      method: "POST",
+      body: JSON.stringify({
+        kind: "franchise_transfer",
+        entityId: 4,
+        actorId: "cs-manager",
+      }),
+    });
+    expect(reRequestRes.status).toBe(201);
+    const reRequested = (await reRequestRes.json()) as ApprovalWorkflow;
+    expect(reRequested.id).not.toBe(created.id);
+    expect(reRequested.stage).toBe("manager_requested");
   });
 });

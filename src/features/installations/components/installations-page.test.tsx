@@ -3,7 +3,8 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SnackbarProvider } from "@/components/ui/snackbar";
 import { InstallationsPage } from "./installations-page";
-import { resetInstallsForTest } from "@/mocks/handlers";
+import { resetInstallsForTest, resetWorkflowsForTest } from "@/mocks/handlers";
+import { AuthProvider } from "@/features/auth/auth-provider";
 
 beforeEach(() => {
   if (!HTMLDialogElement.prototype.showModal) {
@@ -21,15 +22,18 @@ beforeEach(() => {
 
 afterEach(() => {
   resetInstallsForTest();
+  resetWorkflowsForTest();
   vi.restoreAllMocks();
 });
 
 describe("InstallationsPage", () => {
   function renderPage() {
     render(
-      <SnackbarProvider>
-        <InstallationsPage />
-      </SnackbarProvider>,
+      <AuthProvider>
+        <SnackbarProvider>
+          <InstallationsPage />
+        </SnackbarProvider>
+      </AuthProvider>,
     );
   }
 
@@ -56,5 +60,40 @@ describe("InstallationsPage", () => {
     expect(within(drawer).getByLabelText("제품")).toBeInTheDocument();
     expect(within(drawer).getByLabelText("담당기사")).toBeInTheDocument();
     expect(within(drawer).getByLabelText("희망 시간대")).toBeInTheDocument();
+  });
+
+  it("완료 처리 요청을 제출하면 즉시 완료되지 않고 승인 대기 상태가 된다", async () => {
+    window.localStorage.setItem("posmos-auth-user", "tech-manager");
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByText("카페 아모르"));
+    const drawer = screen.getByRole("dialog", { name: "카페 아모르" });
+
+    await user.click(
+      within(drawer).getByRole("button", { name: "완료 처리 요청" }),
+    );
+    const modal = screen.getByRole("dialog", { name: "작업 완료 처리" });
+    await user.type(
+      within(modal).getByLabelText("사진 없음 사유"),
+      "현장 사진 미첨부",
+    );
+    await user.type(
+      within(modal).getByLabelText("결과 메모"),
+      "정상적으로 설치를 완료했습니다.",
+    );
+    await user.click(
+      within(modal).getByRole("button", { name: "완료 처리 요청" }),
+    );
+
+    expect(
+      await within(drawer).findByText(
+        (_, element) =>
+          element?.tagName.toLowerCase() === "li" &&
+          !!element.textContent?.includes("박기사 매니저") &&
+          !!element.textContent?.includes("승인 요청"),
+      ),
+    ).toBeInTheDocument();
+    expect(within(drawer).queryByText("완료 처리됨")).not.toBeInTheDocument();
   });
 });
