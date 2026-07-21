@@ -16,7 +16,7 @@ import {
 } from "@/features/workflow/types";
 
 const ACTION_LABEL: Record<WorkflowActionType, string> = {
-  request: "승인 요청",
+  request: "완료요청",
   responsible_approve: "책임매니저 승인",
   team_lead_approve: "팀장 승인",
   conditional_approve: "조건부 승인",

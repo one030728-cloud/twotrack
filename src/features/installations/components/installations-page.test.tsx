@@ -92,7 +92,7 @@ describe("InstallationsPage", () => {
         (_, element) =>
           element?.tagName.toLowerCase() === "li" &&
           !!element.textContent?.includes("박기사 매니저") &&
-          !!element.textContent?.includes("승인 요청"),
+          !!element.textContent?.includes("완료요청"),
       ),
     ).toBeInTheDocument();
     expect(within(drawer).queryByText("완료 처리됨")).not.toBeInTheDocument();

@@ -83,25 +83,25 @@ describe("FranchiseReceiptsPage", () => {
     expect(within(drawer).getByLabelText("상품")).toBeInTheDocument();
   });
 
-  it("매니저가 이관을 요청하면 요청 이력이 남고 요청 버튼이 사라진다", async () => {
+  it("매니저가 완료요청을 하면 요청 이력이 남고 요청 버튼이 사라진다", async () => {
     window.localStorage.setItem(AUTH_STORAGE_KEY, "cs-manager");
     const user = userEvent.setup();
     renderPage();
     await user.click(await screen.findByText("카페 아모르"));
 
     const drawer = screen.getByRole("dialog", { name: "카페 아모르" });
-    await user.click(within(drawer).getByRole("button", { name: "이관 요청" }));
+    await user.click(within(drawer).getByRole("button", { name: "완료요청" }));
 
     expect(
       await within(drawer).findByText(
         (_, element) =>
           element?.tagName.toLowerCase() === "li" &&
           !!element.textContent?.includes("정지은 매니저") &&
-          !!element.textContent?.includes("승인 요청"),
+          !!element.textContent?.includes("완료요청"),
       ),
     ).toBeInTheDocument();
     expect(
-      within(drawer).queryByRole("button", { name: "이관 요청" }),
+      within(drawer).queryByRole("button", { name: "완료요청" }),
     ).not.toBeInTheDocument();
   });
 

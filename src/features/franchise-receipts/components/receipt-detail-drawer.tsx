@@ -385,7 +385,7 @@ export function ReceiptDetailDrawer({
               canReject={canReject}
               canRequestInfo={canRequestInfo}
               canProvideInfo={canProvideInfo}
-              requestLabel="이관 요청"
+              requestLabel="완료요청"
               onRequest={() => request()}
               onApprove={handleApprove}
               onConditionalApprove={conditionalApprove}
