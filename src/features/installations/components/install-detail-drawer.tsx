@@ -92,9 +92,14 @@ export function InstallDetailDrawer({
     canApproveResponsible,
     canApproveTeamLead,
     canReject,
+    canRequestInfo,
+    canProvideInfo,
     request,
     approve,
+    conditionalApprove,
     reject,
+    requestInfo,
+    provideInfo,
   } = useApprovalWorkflow("install_completion", record.id);
 
   const handleApprove = async (comment?: string) => {
@@ -512,9 +517,14 @@ export function InstallDetailDrawer({
                       canApproveResponsible={canApproveResponsible}
                       canApproveTeamLead={canApproveTeamLead}
                       canReject={canReject}
+                      canRequestInfo={canRequestInfo}
+                      canProvideInfo={canProvideInfo}
                       requestLabel="완료 처리 요청"
                       onApprove={handleApprove}
+                      onConditionalApprove={conditionalApprove}
                       onReject={reject}
+                      onRequestInfo={requestInfo}
+                      onProvideInfo={provideInfo}
                     />
                   </div>
                 )}

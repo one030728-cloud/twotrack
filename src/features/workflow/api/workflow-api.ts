@@ -24,7 +24,14 @@ export async function requestWorkflow(input: {
 
 export async function approveWorkflow(
   workflowId: string,
-  input: { actorId: string; comment?: string },
+  input: {
+    actorId: string;
+    comment?: string;
+    conditional?: boolean;
+    followUpNote?: string;
+    followUpAssigneeId?: string;
+    followUpDueAt?: string;
+  },
 ): Promise<ApprovalWorkflow> {
   const res = await fetch(`/api/workflows/${workflowId}/approve`, {
     method: "POST",
@@ -35,9 +42,36 @@ export async function approveWorkflow(
 
 export async function rejectWorkflow(
   workflowId: string,
-  input: { actorId: string; reason: string },
+  input: {
+    actorId: string;
+    reason: string;
+    reprocessAssigneeId: string;
+    reprocessDueAt: string;
+  },
 ): Promise<ApprovalWorkflow> {
   const res = await fetch(`/api/workflows/${workflowId}/reject`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return res.json();
+}
+
+export async function requestWorkflowInfo(
+  workflowId: string,
+  input: { actorId: string; note: string; targetId: string },
+): Promise<ApprovalWorkflow> {
+  const res = await fetch(`/api/workflows/${workflowId}/request-info`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return res.json();
+}
+
+export async function provideWorkflowInfo(
+  workflowId: string,
+  input: { actorId: string; note: string },
+): Promise<ApprovalWorkflow> {
+  const res = await fetch(`/api/workflows/${workflowId}/provide-info`, {
     method: "POST",
     body: JSON.stringify(input),
   });

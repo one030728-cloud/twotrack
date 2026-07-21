@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ApprovalWorkflowPanel } from "./approval-workflow-panel";
 import type { ApprovalWorkflow } from "@/features/workflow/types";
@@ -43,6 +43,8 @@ function makeWorkflow(
         createdAt: "2026-07-17T10:00:00.000Z",
       },
     ],
+    resumeStage: null,
+    pendingInfoTargetId: null,
     ...overrides,
   };
 }
@@ -134,9 +136,23 @@ describe("ApprovalWorkflowPanel", () => {
       within(dialog).getByPlaceholderText("반려 사유를 입력하세요"),
       "서류 누락",
     );
-    expect(submit).not.toBeDisabled();
+    expect(submit).toBeDisabled();
+
+    await user.click(
+      within(dialog).getByRole("combobox", { name: "재처리 담당자" }),
+    );
+    await user.click(
+      await screen.findByRole("option", { name: "정지은 매니저" }),
+    );
+    await user.type(within(dialog).getByLabelText("재처리기한"), "2026-07-25");
+
+    await waitFor(() => expect(submit).not.toBeDisabled());
     await user.click(submit);
-    expect(onReject).toHaveBeenCalledWith("서류 누락");
+    expect(onReject).toHaveBeenCalledWith({
+      reason: "서류 누락",
+      reprocessAssigneeId: "cs-manager",
+      reprocessDueAt: "2026-07-25",
+    });
   });
 
   it("반려 상태면 단계 배지 대신 반려됨 뱃지를 보여준다", () => {
@@ -155,5 +171,130 @@ describe("ApprovalWorkflowPanel", () => {
       />,
     );
     expect(screen.getByText("반려됨")).toBeInTheDocument();
+  });
+
+  it("조건부 승인 다이얼로그는 보완사항·담당자·기한이 모두 있어야 제출된다", async () => {
+    const user = userEvent.setup();
+    const onConditionalApprove = vi.fn();
+    render(
+      <ApprovalWorkflowPanel
+        workflow={makeWorkflow()}
+        loading={false}
+        canRequest={false}
+        canApproveResponsible
+        canApproveTeamLead={false}
+        canReject
+        requestLabel="이관 요청"
+        onApprove={vi.fn()}
+        onConditionalApprove={onConditionalApprove}
+        onReject={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "조건부 승인" }));
+    const dialog = screen.getByRole("dialog", { name: "조건부 승인" });
+    const submit = within(dialog).getByRole("button", {
+      name: "조건부 승인하기",
+    });
+    expect(submit).toBeDisabled();
+
+    await user.type(
+      within(dialog).getByLabelText("진행을 허용하는 사유"),
+      "일정상 우선 진행",
+    );
+    await user.type(
+      within(dialog).getByLabelText("보완사항"),
+      "사업자등록증 재제출",
+    );
+    await user.click(
+      within(dialog).getByRole("combobox", { name: "보완 담당자" }),
+    );
+    await user.click(
+      await screen.findByRole("option", { name: "정지은 매니저" }),
+    );
+    await user.type(within(dialog).getByLabelText("보완기한"), "2026-07-30");
+
+    await waitFor(() => expect(submit).not.toBeDisabled());
+    await user.click(submit);
+    expect(onConditionalApprove).toHaveBeenCalledWith({
+      allowReason: "일정상 우선 진행",
+      followUpNote: "사업자등록증 재제출",
+      followUpAssigneeId: "cs-manager",
+      followUpDueAt: "2026-07-30",
+    });
+  });
+
+  it("추가정보 요청 권한이 있으면 대상자와 요청내용을 입력해 요청한다", async () => {
+    const user = userEvent.setup();
+    const onRequestInfo = vi.fn();
+    render(
+      <ApprovalWorkflowPanel
+        workflow={makeWorkflow()}
+        loading={false}
+        canRequest={false}
+        canApproveResponsible
+        canApproveTeamLead={false}
+        canReject
+        canRequestInfo
+        requestLabel="이관 요청"
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+        onRequestInfo={onRequestInfo}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "추가정보 요청" }));
+    const dialog = screen.getByRole("dialog", { name: "추가정보 요청" });
+    await user.click(
+      within(dialog).getByRole("combobox", { name: "요청 대상자" }),
+    );
+    await user.click(
+      await screen.findByRole("option", { name: "정지은 매니저" }),
+    );
+    await user.type(
+      within(dialog).getByLabelText("요청 내용"),
+      "사업자번호 확인 필요",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "요청하기" }));
+
+    expect(onRequestInfo).toHaveBeenCalledWith({
+      note: "사업자번호 확인 필요",
+      targetId: "cs-manager",
+    });
+  });
+
+  it("추가정보 요청 상태에서는 전용 배지를 보여주고, 대상자는 정보 제공 버튼을 쓸 수 있다", async () => {
+    const user = userEvent.setup();
+    const onProvideInfo = vi.fn();
+    render(
+      <ApprovalWorkflowPanel
+        workflow={makeWorkflow({
+          stage: "information_required",
+          resumeStage: "manager_requested",
+          pendingInfoTargetId: "cs-manager",
+        })}
+        loading={false}
+        canRequest={false}
+        canApproveResponsible={false}
+        canApproveTeamLead={false}
+        canReject={false}
+        canProvideInfo
+        requestLabel="이관 요청"
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+        onProvideInfo={onProvideInfo}
+      />,
+    );
+
+    expect(screen.getByText(/추가정보 요청됨/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "정보 제공" }));
+    const dialog = screen.getByRole("dialog", { name: "정보 제공" });
+    await user.type(
+      within(dialog).getByLabelText("요청받은 추가정보"),
+      "확인 완료",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "제출하기" }));
+
+    expect(onProvideInfo).toHaveBeenCalledWith("확인 완료");
   });
 });

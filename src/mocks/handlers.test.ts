@@ -316,12 +316,21 @@ describe("승인 워크플로우 handlers", () => {
 
     const rejectRes = await fetch(`/api/workflows/${created.id}/reject`, {
       method: "POST",
-      body: JSON.stringify({ actorId: "cs-responsible", reason: "서류 누락" }),
+      body: JSON.stringify({
+        actorId: "cs-responsible",
+        reason: "서류 누락",
+        reprocessAssigneeId: "cs-manager",
+        reprocessDueAt: "2026-07-25",
+      }),
     });
     expect(rejectRes.status).toBe(200);
     const rejected = (await rejectRes.json()) as ApprovalWorkflow;
     expect(rejected.stage).toBe("rejected");
     expect(rejected.history.at(-1)?.comment).toBe("서류 누락");
+    expect(rejected.history.at(-1)?.reprocessAssigneeName).toBe(
+      "정지은 매니저",
+    );
+    expect(rejected.history.at(-1)?.reprocessDueAt).toBe("2026-07-25");
 
     const reRequestRes = await fetch("/api/workflows", {
       method: "POST",
@@ -335,5 +344,105 @@ describe("승인 워크플로우 handlers", () => {
     const reRequested = (await reRequestRes.json()) as ApprovalWorkflow;
     expect(reRequested.id).not.toBe(created.id);
     expect(reRequested.stage).toBe("manager_requested");
+  });
+
+  it("반려 시 재처리 담당자·기한이 없으면 거부된다", async () => {
+    const requestRes = await fetch("/api/workflows", {
+      method: "POST",
+      body: JSON.stringify({
+        kind: "franchise_transfer",
+        entityId: 5,
+        actorId: "cs-manager",
+      }),
+    });
+    const created = (await requestRes.json()) as ApprovalWorkflow;
+
+    const rejectRes = await fetch(`/api/workflows/${created.id}/reject`, {
+      method: "POST",
+      body: JSON.stringify({ actorId: "cs-responsible", reason: "서류 누락" }),
+    });
+    expect(rejectRes.status).toBe(403);
+  });
+
+  it("조건부 승인은 보완사항·담당자·기한이 모두 있어야 하고 단계는 정상 진행된다", async () => {
+    const requestRes = await fetch("/api/workflows", {
+      method: "POST",
+      body: JSON.stringify({
+        kind: "franchise_transfer",
+        entityId: 6,
+        actorId: "cs-manager",
+      }),
+    });
+    const created = (await requestRes.json()) as ApprovalWorkflow;
+
+    const missingFields = await fetch(`/api/workflows/${created.id}/approve`, {
+      method: "POST",
+      body: JSON.stringify({ actorId: "cs-responsible", conditional: true }),
+    });
+    expect(missingFields.status).toBe(400);
+
+    const approveRes = await fetch(`/api/workflows/${created.id}/approve`, {
+      method: "POST",
+      body: JSON.stringify({
+        actorId: "cs-responsible",
+        conditional: true,
+        comment: "우선 진행",
+        followUpNote: "사업자등록증 재제출",
+        followUpAssigneeId: "cs-manager",
+        followUpDueAt: "2026-07-30",
+      }),
+    });
+    expect(approveRes.status).toBe(200);
+    const approved = (await approveRes.json()) as ApprovalWorkflow;
+    expect(approved.stage).toBe("responsible_approved");
+    expect(approved.history.at(-1)?.action).toBe("conditional_approve");
+    expect(approved.history.at(-1)?.followUpAssigneeName).toBe("정지은 매니저");
+  });
+
+  it("추가정보 요청 후 대상자가 정보를 제공하면 원래 단계로 복귀한다", async () => {
+    const requestRes = await fetch("/api/workflows", {
+      method: "POST",
+      body: JSON.stringify({
+        kind: "franchise_transfer",
+        entityId: 7,
+        actorId: "cs-manager",
+      }),
+    });
+    const created = (await requestRes.json()) as ApprovalWorkflow;
+
+    const infoRes = await fetch(`/api/workflows/${created.id}/request-info`, {
+      method: "POST",
+      body: JSON.stringify({
+        actorId: "cs-responsible",
+        note: "사업자번호 확인 필요",
+        targetId: "cs-manager",
+      }),
+    });
+    expect(infoRes.status).toBe(200);
+    const pending = (await infoRes.json()) as ApprovalWorkflow;
+    expect(pending.stage).toBe("information_required");
+    expect(pending.resumeStage).toBe("manager_requested");
+    expect(pending.pendingInfoTargetId).toBe("cs-manager");
+
+    const wrongActor = await fetch(
+      `/api/workflows/${created.id}/provide-info`,
+      {
+        method: "POST",
+        body: JSON.stringify({ actorId: "cs-responsible", note: "확인함" }),
+      },
+    );
+    expect(wrongActor.status).toBe(403);
+
+    const provideRes = await fetch(
+      `/api/workflows/${created.id}/provide-info`,
+      {
+        method: "POST",
+        body: JSON.stringify({ actorId: "cs-manager", note: "확인 완료" }),
+      },
+    );
+    expect(provideRes.status).toBe(200);
+    const resumed = (await provideRes.json()) as ApprovalWorkflow;
+    expect(resumed.stage).toBe("manager_requested");
+    expect(resumed.pendingInfoTargetId).toBeNull();
   });
 });

@@ -76,9 +76,14 @@ export function ReceiptDetailDrawer({
     canApproveResponsible,
     canApproveTeamLead,
     canReject,
+    canRequestInfo,
+    canProvideInfo,
     request,
     approve,
+    conditionalApprove,
     reject,
+    requestInfo,
+    provideInfo,
   } = useApprovalWorkflow("franchise_transfer", receipt.id);
 
   const handleApprove = async (comment?: string) => {
@@ -378,10 +383,15 @@ export function ReceiptDetailDrawer({
               canApproveResponsible={canApproveResponsible}
               canApproveTeamLead={canApproveTeamLead}
               canReject={canReject}
+              canRequestInfo={canRequestInfo}
+              canProvideInfo={canProvideInfo}
               requestLabel="이관 요청"
               onRequest={() => request()}
               onApprove={handleApprove}
+              onConditionalApprove={conditionalApprove}
               onReject={reject}
+              onRequestInfo={requestInfo}
+              onProvideInfo={provideInfo}
             />
           </div>
         </div>

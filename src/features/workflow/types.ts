@@ -10,12 +10,14 @@ export type WorkflowStage =
   | "manager_requested"
   | "responsible_approved"
   | "team_lead_approved"
+  | "information_required"
   | "rejected";
 
 export const WORKFLOW_STAGE_LABELS: Record<WorkflowStage, string> = {
   manager_requested: "책임매니저 승인대기",
   responsible_approved: "팀장 승인대기",
   team_lead_approved: "승인완료",
+  information_required: "추가정보 요청",
   rejected: "반려",
 };
 
@@ -24,7 +26,13 @@ export function domainForKind(kind: WorkflowKind): WorkflowDomain {
 }
 
 export type WorkflowActionType =
-  "request" | "responsible_approve" | "team_lead_approve" | "reject";
+  | "request"
+  | "responsible_approve"
+  | "team_lead_approve"
+  | "conditional_approve"
+  | "request_info"
+  | "provide_info"
+  | "reject";
 
 export interface WorkflowActionEntry {
   id: string;
@@ -34,6 +42,18 @@ export interface WorkflowActionEntry {
   actorPosition: PositionCode | null;
   comment: string;
   createdAt: string;
+  /** 조건부 수락 시 보완과제 정보 (7.3) */
+  followUpNote?: string;
+  followUpAssigneeId?: string;
+  followUpAssigneeName?: string;
+  followUpDueAt?: string;
+  /** 반려 시 재처리 담당자·기한 (7.4) */
+  reprocessAssigneeId?: string;
+  reprocessAssigneeName?: string;
+  reprocessDueAt?: string;
+  /** 추가정보 요청 대상 (7.5) */
+  infoRequestTargetId?: string;
+  infoRequestTargetName?: string;
 }
 
 export interface ApprovalWorkflow {
@@ -46,4 +66,8 @@ export interface ApprovalWorkflow {
   requestedByName: string;
   requestedAt: string;
   history: WorkflowActionEntry[];
+  /** 추가정보 요청으로 정지되기 전 단계. 정보 제공 시 이 단계로 복귀한다. */
+  resumeStage: WorkflowStage | null;
+  /** 추가정보를 입력해야 하는 대상자. information_required 상태에서만 값이 있다. */
+  pendingInfoTargetId: string | null;
 }

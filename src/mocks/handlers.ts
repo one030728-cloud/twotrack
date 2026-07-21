@@ -32,6 +32,24 @@ import {
   type WorkflowKind,
   type WorkflowStage,
 } from "@/features/workflow/types";
+import type {
+  CreateMerchantInput,
+  MerchantRecord,
+  UpdateMerchantInput,
+} from "@/features/merchants/types";
+import {
+  createFixtureMerchants,
+  createInitialMerchants,
+} from "@/features/merchants/api/mock-data";
+import type {
+  CalendarEvent,
+  CreateCalendarEventInput,
+  UpdateCalendarEventInput,
+} from "@/features/calendar/types";
+import {
+  createFixtureCalendarEvents,
+  createInitialCalendarEvents,
+} from "@/features/calendar/api/mock-data";
 
 /** 테스트 전용 목업 픽스처. 실제 앱 초기 데이터로는 사용하지 않는다. */
 const NOTIFICATION_FIXTURES: AppNotification[] = [
@@ -113,6 +131,20 @@ let employees: AuthUser[] = createInitialEmployees();
 /** 테스트에서 mock 데이터 상태를 시드 값으로 되돌리기 위한 헬퍼. 프로덕션 코드에서는 사용하지 않는다. */
 export function resetEmployeesForTest() {
   employees = createInitialEmployees();
+}
+
+let merchants: MerchantRecord[] = createInitialMerchants();
+
+/** 테스트에서 mock 데이터 상태를 시드 값으로 되돌리기 위한 헬퍼. 프로덕션 코드에서는 사용하지 않는다. */
+export function resetMerchantsForTest() {
+  merchants = createFixtureMerchants();
+}
+
+let calendarEvents: CalendarEvent[] = createInitialCalendarEvents();
+
+/** 테스트에서 mock 데이터 상태를 시드 값으로 되돌리기 위한 헬퍼. 프로덕션 코드에서는 사용하지 않는다. */
+export function resetCalendarEventsForTest() {
+  calendarEvents = createFixtureCalendarEvents();
 }
 
 /** 가맹 접수 건을 기술지원팀 설치관리로 이관하는 부수효과. 승인 워크플로우의 팀장 최종수락 시 호출된다. */
@@ -468,6 +500,8 @@ export const handlers = [
       requestedByName: actor.name,
       requestedAt: now,
       history: [entry],
+      resumeStage: null,
+      pendingInfoTargetId: null,
     };
     workflows = [created, ...workflows];
     return HttpResponse.json(created, { status: 201 });
@@ -482,6 +516,10 @@ export const handlers = [
     const body = (await request.json()) as {
       actorId: string;
       comment?: string;
+      conditional?: boolean;
+      followUpNote?: string;
+      followUpAssigneeId?: string;
+      followUpDueAt?: string;
     };
     const actor = employees.find((u) => u.id === body.actorId);
     const allowedPositions =
@@ -500,6 +538,22 @@ export const handlers = [
     ) {
       return new HttpResponse(null, { status: 403 });
     }
+    // 조건부 수락(7.3)은 보완사항·보완 담당자·보완기한·진행 허용 사유를 모두 요구한다.
+    if (
+      body.conditional &&
+      (!body.followUpNote?.trim() ||
+        !body.followUpAssigneeId ||
+        !body.followUpDueAt ||
+        !body.comment?.trim())
+    ) {
+      return new HttpResponse(null, { status: 400 });
+    }
+    const followUpAssignee = body.conditional
+      ? employees.find((u) => u.id === body.followUpAssigneeId)
+      : undefined;
+    if (body.conditional && !followUpAssignee) {
+      return new HttpResponse(null, { status: 400 });
+    }
 
     const nextStage: WorkflowStage =
       workflow.stage === "manager_requested"
@@ -508,8 +562,9 @@ export const handlers = [
     const now = new Date().toISOString();
     const entry: WorkflowActionEntry = {
       id: `wf-action-${Date.now()}`,
-      action:
-        workflow.stage === "manager_requested"
+      action: body.conditional
+        ? "conditional_approve"
+        : workflow.stage === "manager_requested"
           ? "responsible_approve"
           : "team_lead_approve",
       actorId: actor.id,
@@ -517,6 +572,14 @@ export const handlers = [
       actorPosition: matchedPosition,
       comment: body.comment ?? "",
       createdAt: now,
+      ...(body.conditional
+        ? {
+            followUpNote: body.followUpNote,
+            followUpAssigneeId: followUpAssignee?.id,
+            followUpAssigneeName: followUpAssignee?.name,
+            followUpDueAt: body.followUpDueAt,
+          }
+        : {}),
     };
     const updated: ApprovalWorkflow = {
       ...workflow,
@@ -545,6 +608,8 @@ export const handlers = [
     const body = (await request.json()) as {
       actorId: string;
       reason: string;
+      reprocessAssigneeId: string;
+      reprocessDueAt: string;
     };
     const actor = employees.find((u) => u.id === body.actorId);
     const allowedPositions =
@@ -555,12 +620,19 @@ export const handlers = [
     const matchedPosition = actor?.positions.find((p) =>
       allowedPositions?.includes(p),
     );
+    // 반려(7.4)는 반려 사유·재처리 담당자·재처리기한을 모두 요구한다.
+    // 반려 대상 단계는 현재 결재선 구조상 항상 최초 처리 단계(요청 이전)로 고정된다.
+    const reprocessAssignee = employees.find(
+      (u) => u.id === body.reprocessAssigneeId,
+    );
     if (
       !actor ||
       !allowedPositions ||
       !matchedPosition ||
       actor.id === workflow.requestedBy ||
-      !body.reason?.trim()
+      !body.reason?.trim() ||
+      !reprocessAssignee ||
+      !body.reprocessDueAt
     ) {
       return new HttpResponse(null, { status: 403 });
     }
@@ -574,6 +646,9 @@ export const handlers = [
       actorPosition: matchedPosition,
       comment: body.reason,
       createdAt: now,
+      reprocessAssigneeId: reprocessAssignee.id,
+      reprocessAssigneeName: reprocessAssignee.name,
+      reprocessDueAt: body.reprocessDueAt,
     };
     const updated: ApprovalWorkflow = {
       ...workflow,
@@ -588,6 +663,102 @@ export const handlers = [
       );
     }
 
+    return HttpResponse.json(updated);
+  }),
+
+  // 추가정보 요청(7.5): 현재 단계의 승인 권한자가 요청하며, 응답 전까지 승인 SLA를 정지한다.
+  http.post("/api/workflows/:id/request-info", async ({ params, request }) => {
+    const id = params.id as string;
+    const workflow = workflows.find((w) => w.id === id);
+    if (!workflow) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    const body = (await request.json()) as {
+      actorId: string;
+      note: string;
+      targetId: string;
+    };
+    const actor = employees.find((u) => u.id === body.actorId);
+    const allowedPositions =
+      workflow.stage === "manager_requested" ||
+      workflow.stage === "responsible_approved"
+        ? positionsForStage(workflow.stage, workflow.domain)
+        : null;
+    const matchedPosition = actor?.positions.find((p) =>
+      allowedPositions?.includes(p),
+    );
+    const target = employees.find((u) => u.id === body.targetId);
+    if (
+      !actor ||
+      !allowedPositions ||
+      !matchedPosition ||
+      actor.id === workflow.requestedBy ||
+      !target ||
+      !body.note?.trim()
+    ) {
+      return new HttpResponse(null, { status: 403 });
+    }
+
+    const now = new Date().toISOString();
+    const entry: WorkflowActionEntry = {
+      id: `wf-action-${Date.now()}`,
+      action: "request_info",
+      actorId: actor.id,
+      actorName: actor.name,
+      actorPosition: matchedPosition,
+      comment: body.note,
+      createdAt: now,
+      infoRequestTargetId: target.id,
+      infoRequestTargetName: target.name,
+    };
+    const updated: ApprovalWorkflow = {
+      ...workflow,
+      stage: "information_required",
+      resumeStage: workflow.stage,
+      pendingInfoTargetId: target.id,
+      history: [...workflow.history, entry],
+    };
+    workflows = workflows.map((w) => (w.id === id ? updated : w));
+    return HttpResponse.json(updated);
+  }),
+
+  // 정보 제공(7.5): 정보 등록 후 원래 승인대기 단계로 복귀한다.
+  http.post("/api/workflows/:id/provide-info", async ({ params, request }) => {
+    const id = params.id as string;
+    const workflow = workflows.find((w) => w.id === id);
+    if (!workflow) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    const body = (await request.json()) as { actorId: string; note: string };
+    const actor = employees.find((u) => u.id === body.actorId);
+    if (
+      !actor ||
+      workflow.stage !== "information_required" ||
+      workflow.pendingInfoTargetId !== actor.id ||
+      !workflow.resumeStage ||
+      !body.note?.trim()
+    ) {
+      return new HttpResponse(null, { status: 403 });
+    }
+
+    const now = new Date().toISOString();
+    const entry: WorkflowActionEntry = {
+      id: `wf-action-${Date.now()}`,
+      action: "provide_info",
+      actorId: actor.id,
+      actorName: actor.name,
+      actorPosition: actor.positions[0] ?? null,
+      comment: body.note,
+      createdAt: now,
+    };
+    const updated: ApprovalWorkflow = {
+      ...workflow,
+      stage: workflow.resumeStage,
+      resumeStage: null,
+      pendingInfoTargetId: null,
+      history: [...workflow.history, entry],
+    };
+    workflows = workflows.map((w) => (w.id === id ? updated : w));
     return HttpResponse.json(updated);
   }),
 
@@ -628,6 +799,89 @@ export const handlers = [
       return new HttpResponse(null, { status: 404 });
     }
     employees = employees.filter((e) => e.id !== id);
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  http.get("/api/merchants", () => {
+    return HttpResponse.json(merchants);
+  }),
+
+  http.post("/api/merchants", async ({ request }) => {
+    const input = (await request.json()) as CreateMerchantInput;
+    const created: MerchantRecord = {
+      id: `merchant-${Date.now()}`,
+      name: input.name,
+      owner: input.owner,
+      phone: input.phone,
+      businessNo: input.businessNo ?? "",
+      address: input.address ?? "",
+      status: input.status ?? "consulting",
+      manager: input.manager ?? "",
+      contractDate: input.contractDate ?? null,
+      memo: input.memo ?? "",
+    };
+    merchants = [created, ...merchants];
+    return HttpResponse.json(created, { status: 201 });
+  }),
+
+  http.patch("/api/merchants/:id", async ({ params, request }) => {
+    const id = params.id as string;
+    const target = merchants.find((m) => m.id === id);
+    if (!target) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    const patch = (await request.json()) as UpdateMerchantInput;
+    const updated: MerchantRecord = { ...target, ...patch };
+    merchants = merchants.map((m) => (m.id === id ? updated : m));
+    return HttpResponse.json(updated);
+  }),
+
+  http.delete("/api/merchants/:id", ({ params }) => {
+    const id = params.id as string;
+    const target = merchants.find((m) => m.id === id);
+    if (!target) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    merchants = merchants.filter((m) => m.id !== id);
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  http.get("/api/calendar-events", () => {
+    return HttpResponse.json(calendarEvents);
+  }),
+
+  http.post("/api/calendar-events", async ({ request }) => {
+    const input = (await request.json()) as CreateCalendarEventInput;
+    const created: CalendarEvent = {
+      id: `event-${Date.now()}`,
+      title: input.title,
+      date: input.date,
+      type: input.type ?? "etc",
+      memo: input.memo ?? "",
+    };
+    calendarEvents = [...calendarEvents, created];
+    return HttpResponse.json(created, { status: 201 });
+  }),
+
+  http.patch("/api/calendar-events/:id", async ({ params, request }) => {
+    const id = params.id as string;
+    const target = calendarEvents.find((e) => e.id === id);
+    if (!target) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    const patch = (await request.json()) as UpdateCalendarEventInput;
+    const updated: CalendarEvent = { ...target, ...patch };
+    calendarEvents = calendarEvents.map((e) => (e.id === id ? updated : e));
+    return HttpResponse.json(updated);
+  }),
+
+  http.delete("/api/calendar-events/:id", ({ params }) => {
+    const id = params.id as string;
+    const target = calendarEvents.find((e) => e.id === id);
+    if (!target) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    calendarEvents = calendarEvents.filter((e) => e.id !== id);
     return new HttpResponse(null, { status: 204 });
   }),
 ];

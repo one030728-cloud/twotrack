@@ -105,7 +105,11 @@ describe("useApprovalWorkflow", () => {
       expect(responsibleView.result.current.loading).toBe(false),
     );
     await act(async () => {
-      await responsibleView.result.current.reject("사진 누락");
+      await responsibleView.result.current.reject({
+        reason: "사진 누락",
+        reprocessAssigneeId: "tech-manager",
+        reprocessDueAt: "2026-07-25",
+      });
     });
     expect(responsibleView.result.current.workflow?.stage).toBe("rejected");
     expect(
@@ -121,5 +125,104 @@ describe("useApprovalWorkflow", () => {
     await waitFor(() => expect(retryView.result.current.loading).toBe(false));
     expect(retryView.result.current.canRequest).toBe(true);
     retryView.unmount();
+  });
+
+  it("추가정보 요청을 받으면 대상자만 정보를 제공해 원래 단계로 되돌릴 수 있다", async () => {
+    loginAs("tech-manager");
+    const managerView = renderHook(
+      () => useApprovalWorkflow("install_completion", 3),
+      { wrapper },
+    );
+    await waitFor(() => expect(managerView.result.current.loading).toBe(false));
+    await act(async () => {
+      await managerView.result.current.request({
+        resultMemo: "정상 설치",
+        completionPhotoMissingReason: "",
+        deviceResults: [],
+        attachments: [],
+        historyLabel: "완료 처리 테스트",
+      });
+    });
+    managerView.unmount();
+
+    loginAs("tech-responsible");
+    const responsibleView = renderHook(
+      () => useApprovalWorkflow("install_completion", 3),
+      { wrapper },
+    );
+    await waitFor(() =>
+      expect(responsibleView.result.current.loading).toBe(false),
+    );
+    expect(responsibleView.result.current.canRequestInfo).toBe(true);
+    await act(async () => {
+      await responsibleView.result.current.requestInfo({
+        note: "완료 사진 확인 필요",
+        targetId: "tech-manager",
+      });
+    });
+    expect(responsibleView.result.current.workflow?.stage).toBe(
+      "information_required",
+    );
+    responsibleView.unmount();
+
+    loginAs("tech-manager");
+    const managerRetry = renderHook(
+      () => useApprovalWorkflow("install_completion", 3),
+      { wrapper },
+    );
+    await waitFor(() =>
+      expect(managerRetry.result.current.loading).toBe(false),
+    );
+    expect(managerRetry.result.current.canProvideInfo).toBe(true);
+    await act(async () => {
+      await managerRetry.result.current.provideInfo("사진 첨부 완료");
+    });
+    expect(managerRetry.result.current.workflow?.stage).toBe(
+      "manager_requested",
+    );
+    managerRetry.unmount();
+  });
+
+  it("조건부 승인은 단계를 정상 진행시키고 보완 정보를 이력에 남긴다", async () => {
+    loginAs("tech-manager");
+    const managerView = renderHook(
+      () => useApprovalWorkflow("install_completion", 4),
+      { wrapper },
+    );
+    await waitFor(() => expect(managerView.result.current.loading).toBe(false));
+    await act(async () => {
+      await managerView.result.current.request({
+        resultMemo: "정상 설치",
+        completionPhotoMissingReason: "",
+        deviceResults: [],
+        attachments: [],
+        historyLabel: "완료 처리 테스트",
+      });
+    });
+    managerView.unmount();
+
+    loginAs("tech-responsible");
+    const responsibleView = renderHook(
+      () => useApprovalWorkflow("install_completion", 4),
+      { wrapper },
+    );
+    await waitFor(() =>
+      expect(responsibleView.result.current.loading).toBe(false),
+    );
+    await act(async () => {
+      await responsibleView.result.current.conditionalApprove({
+        allowReason: "일정상 우선 진행",
+        followUpNote: "부품 시리얼 재확인",
+        followUpAssigneeId: "tech-manager",
+        followUpDueAt: "2026-07-28",
+      });
+    });
+    expect(responsibleView.result.current.workflow?.stage).toBe(
+      "responsible_approved",
+    );
+    expect(
+      responsibleView.result.current.workflow?.history.at(-1)?.action,
+    ).toBe("conditional_approve");
+    responsibleView.unmount();
   });
 });
