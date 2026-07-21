@@ -1,12 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  resetEmployeesForTest,
   resetInstallsForTest,
   resetReceiptsForTest,
   resetWorkflowsForTest,
 } from "./handlers";
+import { loadPersistedDb } from "./persisted-store";
 import type { FranchiseReceipt } from "@/features/franchise-receipts/types";
 import type { InstallRecord } from "@/features/installations/types";
 import type { ApprovalWorkflow } from "@/features/workflow/types";
+import type { AuthUser } from "@/features/auth/permissions";
 
 // 실제 서비스는 빈 목록에서 시작하므로(mock-data.ts의 createInitial*), 아래 테스트들이
 // 전제하는 목업 픽스처 상태를 매 테스트 시작 전에 명시적으로 시딩한다.
@@ -121,7 +124,10 @@ describe("franchise-receipts handlers", () => {
 });
 
 describe("install handlers", () => {
-  afterEach(() => resetInstallsForTest());
+  afterEach(() => {
+    resetInstallsForTest();
+    window.localStorage.clear();
+  });
 
   it("GET /api/installs는 설치/택배/AS mock 목록을 반환한다", async () => {
     const res = await fetch("/api/installs");
@@ -216,6 +222,73 @@ describe("install handlers", () => {
       method: "DELETE",
     });
     expect(missingDelete.status).toBe(404);
+  });
+
+  it("등록/수정/삭제한 목록은 새로고침을 흉내낸 localStorage 스냅샷에도 반영된다", async () => {
+    const createRes = await fetch("/api/installs", {
+      method: "POST",
+      body: JSON.stringify({
+        kind: "install",
+        customerName: "새로고침 테스트",
+        phone: "010-5555-6666",
+      }),
+    });
+    const created = (await createRes.json()) as InstallRecord;
+
+    // 새로고침은 JS를 재실행해 handlers 모듈을 다시 로드하는 것과 같다.
+    // 이때 module-level 변수는 사라지므로 localStorage 스냅샷만으로 상태를 복원할 수 있어야 한다.
+    const persistedAfterCreate = loadPersistedDb();
+    const installsAfterCreate =
+      persistedAfterCreate.installs as InstallRecord[];
+    expect(installsAfterCreate.some((r) => r.id === created.id)).toBe(true);
+
+    await fetch(`/api/installs/${created.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "scheduled" }),
+    });
+    const persistedAfterPatch = loadPersistedDb();
+    const installsAfterPatch = persistedAfterPatch.installs as InstallRecord[];
+    expect(installsAfterPatch.find((r) => r.id === created.id)?.status).toBe(
+      "scheduled",
+    );
+
+    await fetch(`/api/installs/${created.id}`, { method: "DELETE" });
+    const persistedAfterDelete = loadPersistedDb();
+    const installsAfterDelete =
+      persistedAfterDelete.installs as InstallRecord[];
+    expect(installsAfterDelete.some((r) => r.id === created.id)).toBe(false);
+  });
+});
+
+describe("employee handlers", () => {
+  afterEach(() => {
+    resetEmployeesForTest();
+    window.localStorage.clear();
+  });
+
+  it("DELETE /api/employees/:id는 목록과 localStorage 스냅샷에서 모두 제거한다", async () => {
+    const deleteRes = await fetch("/api/employees/viewer", {
+      method: "DELETE",
+    });
+    expect(deleteRes.status).toBe(204);
+
+    const listRes = await fetch("/api/employees");
+    const list = (await listRes.json()) as AuthUser[];
+    expect(list.some((e) => e.id === "viewer")).toBe(false);
+
+    // 새로고침은 JS를 재실행해 handlers 모듈을 다시 로드하는 것과 같다.
+    // 삭제가 module-level 변수에만 반영되고 localStorage에 저장되지 않으면
+    // 새로고침 후 삭제한 직원이 되살아난다.
+    const persisted = loadPersistedDb();
+    const persistedEmployees = persisted.employees as AuthUser[];
+    expect(persistedEmployees.some((e) => e.id === "viewer")).toBe(false);
+  });
+
+  it("존재하지 않는 id를 DELETE하면 404를 반환한다", async () => {
+    const res = await fetch("/api/employees/no-such-id", {
+      method: "DELETE",
+    });
+    expect(res.status).toBe(404);
   });
 });
 

@@ -50,6 +50,34 @@ import {
   createFixtureCalendarEvents,
   createInitialCalendarEvents,
 } from "@/features/calendar/api/mock-data";
+import type {
+  CreateExternalTechInput,
+  ExternalTechRecord,
+  UpdateExternalTechInput,
+} from "@/features/external-techs/types";
+import {
+  createFixtureExternalTechs,
+  createInitialExternalTechs,
+} from "@/features/external-techs/api/mock-data";
+import type {
+  CreateInventoryItemInput,
+  InventoryItemRecord,
+  RecordInventoryCountInput,
+} from "@/features/inventory/types";
+import {
+  createFixtureInventoryItems,
+  createInitialInventoryItems,
+} from "@/features/inventory/api/mock-data";
+import type {
+  CreateTransferInput,
+  TransferRecord,
+  UpdateTransferInput,
+} from "@/features/transfers/types";
+import {
+  createFixtureTransfers,
+  createInitialTransfers,
+} from "@/features/transfers/api/mock-data";
+import { asArray, loadPersistedDb, savePersistedDb } from "./persisted-store";
 
 /** 테스트 전용 목업 픽스처. 실제 앱 초기 데이터로는 사용하지 않는다. */
 const NOTIFICATION_FIXTURES: AppNotification[] = [
@@ -97,54 +125,121 @@ const NOTIFICATION_FIXTURES: AppNotification[] = [
   },
 ];
 
+/** 새로고침 시 이전 세션에서 저장된 목업 데이터가 있으면 그 값으로 시작한다. */
+const persisted = loadPersistedDb();
+
 /** 실제 서비스 초기 상태. 데모용 목데이터 없이 빈 목록에서 시작한다. */
-let notifications: AppNotification[] = [];
+let notifications: AppNotification[] = asArray(
+  persisted.notifications,
+  () => [],
+);
 
 /** 테스트에서 mock 데이터 상태를 시드 값으로 되돌리기 위한 헬퍼. 프로덕션 코드에서는 사용하지 않는다. */
 export function resetNotificationsForTest() {
   notifications = NOTIFICATION_FIXTURES.map((n) => ({ ...n }));
 }
 
-let receipts: FranchiseReceipt[] = createInitialReceipts();
+let receipts: FranchiseReceipt[] = asArray(
+  persisted.receipts,
+  createInitialReceipts,
+);
 
 /** 테스트에서 mock 데이터 상태를 시드 값으로 되돌리기 위한 헬퍼. 프로덕션 코드에서는 사용하지 않는다. */
 export function resetReceiptsForTest() {
   receipts = createFixtureReceipts();
 }
 
-let installs: InstallRecord[] = createInitialInstalls();
+let installs: InstallRecord[] = asArray(
+  persisted.installs,
+  createInitialInstalls,
+);
 
 /** 테스트에서 mock 데이터 상태를 시드 값으로 되돌리기 위한 헬퍼. 프로덕션 코드에서는 사용하지 않는다. */
 export function resetInstallsForTest() {
   installs = createFixtureInstalls();
 }
 
-let workflows: ApprovalWorkflow[] = [];
+let workflows: ApprovalWorkflow[] = asArray(persisted.workflows, () => []);
 
 /** 테스트에서 mock 데이터 상태를 시드 값으로 되돌리기 위한 헬퍼. 프로덕션 코드에서는 사용하지 않는다. */
 export function resetWorkflowsForTest() {
   workflows = [];
 }
 
-let employees: AuthUser[] = createInitialEmployees();
+let employees: AuthUser[] = asArray(
+  persisted.employees,
+  createInitialEmployees,
+);
 
 /** 테스트에서 mock 데이터 상태를 시드 값으로 되돌리기 위한 헬퍼. 프로덕션 코드에서는 사용하지 않는다. */
 export function resetEmployeesForTest() {
   employees = createInitialEmployees();
 }
 
-let merchants: MerchantRecord[] = createInitialMerchants();
+let merchants: MerchantRecord[] = asArray(
+  persisted.merchants,
+  createInitialMerchants,
+);
 
 /** 테스트에서 mock 데이터 상태를 시드 값으로 되돌리기 위한 헬퍼. 프로덕션 코드에서는 사용하지 않는다. */
 export function resetMerchantsForTest() {
   merchants = createFixtureMerchants();
 }
 
-let calendarEvents: CalendarEvent[] = createInitialCalendarEvents();
+let calendarEvents: CalendarEvent[] = asArray(
+  persisted.calendarEvents,
+  createInitialCalendarEvents,
+);
 
 /** 테스트에서 mock 데이터 상태를 시드 값으로 되돌리기 위한 헬퍼. 프로덕션 코드에서는 사용하지 않는다. */
 export function resetCalendarEventsForTest() {
   calendarEvents = createFixtureCalendarEvents();
+}
+
+let externalTechs: ExternalTechRecord[] = asArray(
+  persisted.externalTechs,
+  createInitialExternalTechs,
+);
+
+/** 테스트에서 mock 데이터 상태를 시드 값으로 되돌리기 위한 헬퍼. 프로덕션 코드에서는 사용하지 않는다. */
+export function resetExternalTechsForTest() {
+  externalTechs = createFixtureExternalTechs();
+}
+
+let inventoryItems: InventoryItemRecord[] = asArray(
+  persisted.inventoryItems,
+  createInitialInventoryItems,
+);
+
+/** 테스트에서 mock 데이터 상태를 시드 값으로 되돌리기 위한 헬퍼. 프로덕션 코드에서는 사용하지 않는다. */
+export function resetInventoryForTest() {
+  inventoryItems = createFixtureInventoryItems();
+}
+
+let transfers: TransferRecord[] = asArray(
+  persisted.transfers,
+  createInitialTransfers,
+);
+
+/** 테스트에서 mock 데이터 상태를 시드 값으로 되돌리기 위한 헬퍼. 프로덕션 코드에서는 사용하지 않는다. */
+export function resetTransfersForTest() {
+  transfers = createFixtureTransfers();
+}
+
+/** 상태 변경 후 호출해 localStorage 스냅샷을 갱신한다. 새로고침 후에도 데이터가 유지되도록 한다. */
+function persistMockDb() {
+  savePersistedDb({
+    notifications,
+    receipts,
+    installs,
+    workflows,
+    employees,
+    merchants,
+    calendarEvents,
+    externalTechs,
+    inventoryItems,
+    transfers,
+  });
 }
 
 /** 가맹 접수 건을 기술지원팀 설치관리로 이관하는 부수효과. 승인 워크플로우의 팀장 최종수락 시 호출된다. */
@@ -167,6 +262,7 @@ function performFranchiseTransfer(id: number) {
     ],
   };
   receipts = receipts.map((r) => (r.id === id ? transferredReceipt : r));
+  persistMockDb();
 
   const existing = installs.find(
     (install) =>
@@ -215,6 +311,7 @@ function performFranchiseTransfer(id: number) {
     pendingCompletion: null,
   };
   installs = [created, ...installs];
+  persistMockDb();
 
   return { receipt: transferredReceipt, install: created };
 }
@@ -250,6 +347,7 @@ function performInstallCompletion(id: number) {
     pendingCompletion: null,
   };
   installs = installs.map((r) => (r.id === id ? updated : r));
+  persistMockDb();
   return updated;
 }
 
@@ -307,11 +405,13 @@ export const handlers = [
     notifications = notifications.map((n) =>
       n.id === id ? { ...n, read: true } : n,
     );
+    persistMockDb();
     return HttpResponse.json({ ...target, read: true });
   }),
 
   http.post("/api/notifications/read-all", () => {
     notifications = notifications.map((n) => ({ ...n, read: true }));
+    persistMockDb();
     return HttpResponse.json(notifications);
   }),
 
@@ -347,6 +447,7 @@ export const handlers = [
       unassigned: !input.csRep,
     };
     receipts = [created, ...receipts];
+    persistMockDb();
     return HttpResponse.json(created, { status: 201 });
   }),
 
@@ -372,6 +473,7 @@ export const handlers = [
       unassigned: patch.csRep !== undefined ? !patch.csRep : target.unassigned,
     };
     receipts = receipts.map((r) => (r.id === id ? updated : r));
+    persistMockDb();
     return HttpResponse.json(updated);
   }),
 
@@ -413,6 +515,7 @@ export const handlers = [
       pendingCompletion: null,
     };
     installs = [created, ...installs];
+    persistMockDb();
     return HttpResponse.json(created, { status: 201 });
   }),
 
@@ -425,6 +528,7 @@ export const handlers = [
     const patch = (await request.json()) as Partial<InstallRecord>;
     const updated: InstallRecord = { ...target, ...patch };
     installs = installs.map((r) => (r.id === id ? updated : r));
+    persistMockDb();
     return HttpResponse.json(updated);
   }),
 
@@ -438,6 +542,7 @@ export const handlers = [
       return new HttpResponse(null, { status: 403 });
     }
     installs = installs.filter((r) => r.id !== id);
+    persistMockDb();
     return new HttpResponse(null, { status: 204 });
   }),
 
@@ -504,6 +609,7 @@ export const handlers = [
       pendingInfoTargetId: null,
     };
     workflows = [created, ...workflows];
+    persistMockDb();
     return HttpResponse.json(created, { status: 201 });
   }),
 
@@ -587,6 +693,7 @@ export const handlers = [
       history: [...workflow.history, entry],
     };
     workflows = workflows.map((w) => (w.id === id ? updated : w));
+    persistMockDb();
 
     if (nextStage === "team_lead_approved") {
       if (workflow.kind === "franchise_transfer") {
@@ -662,6 +769,7 @@ export const handlers = [
         r.id === workflow.entityId ? { ...r, pendingCompletion: null } : r,
       );
     }
+    persistMockDb();
 
     return HttpResponse.json(updated);
   }),
@@ -719,6 +827,7 @@ export const handlers = [
       history: [...workflow.history, entry],
     };
     workflows = workflows.map((w) => (w.id === id ? updated : w));
+    persistMockDb();
     return HttpResponse.json(updated);
   }),
 
@@ -759,6 +868,7 @@ export const handlers = [
       history: [...workflow.history, entry],
     };
     workflows = workflows.map((w) => (w.id === id ? updated : w));
+    persistMockDb();
     return HttpResponse.json(updated);
   }),
 
@@ -777,6 +887,7 @@ export const handlers = [
       active: input.active ?? true,
     };
     employees = [...employees, created];
+    persistMockDb();
     return HttpResponse.json(created, { status: 201 });
   }),
 
@@ -789,6 +900,7 @@ export const handlers = [
     const patch = (await request.json()) as UpdateEmployeeInput;
     const updated: AuthUser = { ...target, ...patch };
     employees = employees.map((e) => (e.id === id ? updated : e));
+    persistMockDb();
     return HttpResponse.json(updated);
   }),
 
@@ -799,6 +911,7 @@ export const handlers = [
       return new HttpResponse(null, { status: 404 });
     }
     employees = employees.filter((e) => e.id !== id);
+    persistMockDb();
     return new HttpResponse(null, { status: 204 });
   }),
 
@@ -821,6 +934,7 @@ export const handlers = [
       memo: input.memo ?? "",
     };
     merchants = [created, ...merchants];
+    persistMockDb();
     return HttpResponse.json(created, { status: 201 });
   }),
 
@@ -833,6 +947,7 @@ export const handlers = [
     const patch = (await request.json()) as UpdateMerchantInput;
     const updated: MerchantRecord = { ...target, ...patch };
     merchants = merchants.map((m) => (m.id === id ? updated : m));
+    persistMockDb();
     return HttpResponse.json(updated);
   }),
 
@@ -843,6 +958,7 @@ export const handlers = [
       return new HttpResponse(null, { status: 404 });
     }
     merchants = merchants.filter((m) => m.id !== id);
+    persistMockDb();
     return new HttpResponse(null, { status: 204 });
   }),
 
@@ -860,6 +976,7 @@ export const handlers = [
       memo: input.memo ?? "",
     };
     calendarEvents = [...calendarEvents, created];
+    persistMockDb();
     return HttpResponse.json(created, { status: 201 });
   }),
 
@@ -872,6 +989,7 @@ export const handlers = [
     const patch = (await request.json()) as UpdateCalendarEventInput;
     const updated: CalendarEvent = { ...target, ...patch };
     calendarEvents = calendarEvents.map((e) => (e.id === id ? updated : e));
+    persistMockDb();
     return HttpResponse.json(updated);
   }),
 
@@ -882,6 +1000,154 @@ export const handlers = [
       return new HttpResponse(null, { status: 404 });
     }
     calendarEvents = calendarEvents.filter((e) => e.id !== id);
+    persistMockDb();
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  http.get("/api/external-techs", () => {
+    return HttpResponse.json(externalTechs);
+  }),
+
+  http.post("/api/external-techs", async ({ request }) => {
+    const input = (await request.json()) as CreateExternalTechInput;
+    const created: ExternalTechRecord = {
+      id: `ext-tech-${Date.now()}`,
+      name: input.name,
+      phone: input.phone,
+      company: input.company ?? "",
+      region: input.region ?? "",
+      specialty: input.specialty ?? "",
+      status: input.status ?? "active",
+      contractedAt: input.contractedAt ?? null,
+      memo: input.memo ?? "",
+    };
+    externalTechs = [created, ...externalTechs];
+    persistMockDb();
+    return HttpResponse.json(created, { status: 201 });
+  }),
+
+  http.patch("/api/external-techs/:id", async ({ params, request }) => {
+    const id = params.id as string;
+    const target = externalTechs.find((t) => t.id === id);
+    if (!target) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    const patch = (await request.json()) as UpdateExternalTechInput;
+    const updated: ExternalTechRecord = { ...target, ...patch };
+    externalTechs = externalTechs.map((t) => (t.id === id ? updated : t));
+    persistMockDb();
+    return HttpResponse.json(updated);
+  }),
+
+  http.delete("/api/external-techs/:id", ({ params }) => {
+    const id = params.id as string;
+    const target = externalTechs.find((t) => t.id === id);
+    if (!target) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    externalTechs = externalTechs.filter((t) => t.id !== id);
+    persistMockDb();
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  http.get("/api/inventory", () => {
+    return HttpResponse.json(inventoryItems);
+  }),
+
+  http.post("/api/inventory", async ({ request }) => {
+    const input = (await request.json()) as CreateInventoryItemInput;
+    const created: InventoryItemRecord = {
+      id: `inv-${Date.now()}`,
+      modelName: input.modelName,
+      location: input.location,
+      expectedQty: input.expectedQty,
+      countedQty: null,
+      status: "pending",
+      countedBy: null,
+      countedAt: null,
+      memo: input.memo ?? "",
+    };
+    inventoryItems = [created, ...inventoryItems];
+    persistMockDb();
+    return HttpResponse.json(created, { status: 201 });
+  }),
+
+  http.post("/api/inventory/:id/count", async ({ params, request }) => {
+    const id = params.id as string;
+    const target = inventoryItems.find((item) => item.id === id);
+    if (!target) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    const body = (await request.json()) as RecordInventoryCountInput;
+    const updated: InventoryItemRecord = {
+      ...target,
+      countedQty: body.countedQty,
+      countedBy: body.countedBy,
+      countedAt: new Date().toISOString(),
+      status: body.countedQty === target.expectedQty ? "matched" : "mismatched",
+    };
+    inventoryItems = inventoryItems.map((item) =>
+      item.id === id ? updated : item,
+    );
+    persistMockDb();
+    return HttpResponse.json(updated);
+  }),
+
+  http.delete("/api/inventory/:id", ({ params }) => {
+    const id = params.id as string;
+    const target = inventoryItems.find((item) => item.id === id);
+    if (!target) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    inventoryItems = inventoryItems.filter((item) => item.id !== id);
+    persistMockDb();
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  http.get("/api/transfers", () => {
+    return HttpResponse.json(transfers);
+  }),
+
+  http.post("/api/transfers", async ({ request }) => {
+    const input = (await request.json()) as CreateTransferInput;
+    const created: TransferRecord = {
+      id: `transfer-${Date.now()}`,
+      name: input.name,
+      owner: input.owner,
+      phone: input.phone,
+      transferType: input.transferType,
+      status: input.status ?? "receipt",
+      scheduledDate: input.scheduledDate ?? null,
+      assignedTech: input.assignedTech ?? null,
+      address: input.address ?? "",
+      memo: input.memo ?? "",
+    };
+    transfers = [created, ...transfers];
+    persistMockDb();
+    return HttpResponse.json(created, { status: 201 });
+  }),
+
+  http.patch("/api/transfers/:id", async ({ params, request }) => {
+    const id = params.id as string;
+    const target = transfers.find((t) => t.id === id);
+    if (!target) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    const patch = (await request.json()) as UpdateTransferInput;
+    const updated: TransferRecord = { ...target, ...patch };
+    transfers = transfers.map((t) => (t.id === id ? updated : t));
+    persistMockDb();
+    return HttpResponse.json(updated);
+  }),
+
+  http.delete("/api/transfers/:id", ({ params }) => {
+    const id = params.id as string;
+    const target = transfers.find((t) => t.id === id);
+    if (!target) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    transfers = transfers.filter((t) => t.id !== id);
+    persistMockDb();
     return new HttpResponse(null, { status: 204 });
   }),
 ];
