@@ -70,6 +70,12 @@ export function EmployeeFormModal({
     canEditCredentials &&
     trimmedUsername.length > 0 &&
     existingUsernames.includes(trimmedUsername);
+  /** 아이디만 있고 비밀번호가 없으면 로그인이 불가능한 계정이 만들어지므로 함께 입력을 강제한다. */
+  const passwordRequired =
+    canEditCredentials &&
+    trimmedUsername.length > 0 &&
+    (!initial || !initial.username) &&
+    !password;
 
   const teamOptions: { value: string; label: string }[] = TEAM_OPTIONS.map(
     (value) => ({ value, label: value }),
@@ -99,7 +105,8 @@ export function EmployeeFormModal({
     );
   };
 
-  const canSubmit = !!name.trim() && !!team.trim() && !usernameTaken;
+  const canSubmit =
+    !!name.trim() && !!team.trim() && !usernameTaken && !passwordRequired;
 
   const handleSubmit = () => {
     if (!canSubmit) return;
@@ -145,6 +152,11 @@ export function EmployeeFormModal({
               placeholder={initial ? "변경 시에만 입력" : undefined}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              error={
+                passwordRequired
+                  ? "아이디를 입력하면 비밀번호도 함께 입력해야 합니다."
+                  : undefined
+              }
             />
           </>
         )}

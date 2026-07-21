@@ -164,6 +164,26 @@ describe("UsersAdminPage", () => {
     expect(within(row).getByText(/new-account/)).toBeInTheDocument();
   });
 
+  it("아이디만 입력하고 비밀번호를 비워두면 추가할 수 없다", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("정지은 매니저");
+
+    await user.click(screen.getByRole("button", { name: "직원 추가" }));
+    const modal = screen.getByRole("dialog", { name: "직원 추가" });
+    await user.type(within(modal).getByLabelText("이름"), "빈비번 계정");
+    await user.type(within(modal).getByLabelText("아이디"), "no-password");
+    await user.click(within(modal).getByRole("combobox", { name: "팀" }));
+    await user.click(await screen.findByRole("option", { name: "CS" }));
+
+    expect(within(modal).getByRole("button", { name: "추가" })).toBeDisabled();
+    expect(
+      within(modal).getByText(
+        "아이디를 입력하면 비밀번호도 함께 입력해야 합니다.",
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("마스터가 아니면 아이디·비밀번호 입력란이 보이지 않는다", async () => {
     window.localStorage.setItem("posmos-auth-user", "cs-manager");
     const user = userEvent.setup();
