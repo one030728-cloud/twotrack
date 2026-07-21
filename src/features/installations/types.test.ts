@@ -3,6 +3,7 @@ import {
   matchesInstallStatusTab,
   statusOptionsForKind,
   statusTabsForKind,
+  techNameForUserName,
   STATUS_FLOW_BY_KIND,
   type InstallRecord,
 } from "./types";
@@ -62,5 +63,16 @@ describe("statusOptionsForKind", () => {
     expect(parcel).toContain("received");
     expect(as).toContain("asDone");
     expect(install).not.toContain("received");
+  });
+});
+
+describe("techNameForUserName", () => {
+  it("계정명이 기사 짧은 이름으로 시작하면 해당 기사명을 반환한다", () => {
+    expect(techNameForUserName("박기사 매니저")).toBe("박기사");
+    expect(techNameForUserName("최기사 팀장")).toBe("최기사");
+  });
+
+  it("일치하는 기사가 없으면 null을 반환한다", () => {
+    expect(techNameForUserName("관리자")).toBeNull();
   });
 });

@@ -203,6 +203,11 @@ export const INSTALL_TECH_OPTIONS: { value: string; label: string }[] = [
   { value: "미배정", label: "미배정" },
 ];
 
+/** 로그인 계정명(예: "박기사 매니저")에서 담당기사 배정에 쓰이는 짧은 이름을 찾는다. */
+export function techNameForUserName(userName: string): string | null {
+  return INSTALL_TECHS.find((tech) => userName.startsWith(tech)) ?? null;
+}
+
 /** 기기/제품 관리가 생기기 전까지의 임시 정적 목록 (seam) */
 export const PRODUCT_OPTIONS: { value: string; label: string }[] = [
   { value: "카드단말기 A100", label: "카드단말기 A100" },
