@@ -24,6 +24,7 @@ function mockRole(role: UserRole) {
       role,
       positions: [],
       active: true,
+      username: role,
     },
     login: vi.fn(),
     logout: vi.fn(),

@@ -11,11 +11,13 @@ import {
   MASTER_REQUIRED_TEAM,
   POSITION_OPTIONS,
   TEAM_OPTIONS,
+  isMaster,
   roleLabel,
   type AuthUser,
   type PositionCode,
   type UserRole,
 } from "@/features/auth/permissions";
+import { useAuth } from "@/features/auth/auth-provider";
 
 const ROLE_OPTIONS: { value: UserRole; label: string }[] = (
   ["admin", "cs", "tech", "viewer"] as UserRole[]
@@ -27,12 +29,16 @@ export interface EmployeeFormValue {
   role: UserRole;
   positions: PositionCode[];
   active: boolean;
+  username?: string;
+  password?: string;
 }
 
 interface EmployeeFormModalProps {
   title: string;
   submitLabel: string;
   initial?: AuthUser;
+  /** 이미 사용 중인 아이디 목록(수정 대상 본인 제외). 중복 검사에 사용. */
+  existingUsernames?: string[];
   onClose: () => void;
   onSubmit: (value: EmployeeFormValue) => void;
 }
@@ -41,10 +47,13 @@ export function EmployeeFormModal({
   title,
   submitLabel,
   initial,
+  existingUsernames = [],
   onClose,
   onSubmit,
 }: EmployeeFormModalProps) {
   const titleId = useId();
+  const { user: currentUser } = useAuth();
+  const canEditCredentials = !!currentUser && isMaster(currentUser);
   const [name, setName] = useState(initial?.name ?? "");
   const [team, setTeam] = useState(initial?.team ?? "");
   const [role, setRole] = useState<UserRole>(initial?.role ?? "cs");
@@ -52,8 +61,15 @@ export function EmployeeFormModal({
     initial?.positions ?? [],
   );
   const [active, setActive] = useState(initial?.active ?? true);
+  const [username, setUsername] = useState(initial?.username ?? "");
+  const [password, setPassword] = useState("");
 
   const isMasterRequiredTeam = team === MASTER_REQUIRED_TEAM;
+  const trimmedUsername = username.trim();
+  const usernameTaken =
+    canEditCredentials &&
+    trimmedUsername.length > 0 &&
+    existingUsernames.includes(trimmedUsername);
 
   const teamOptions: { value: string; label: string }[] = TEAM_OPTIONS.map(
     (value) => ({ value, label: value }),
@@ -83,11 +99,19 @@ export function EmployeeFormModal({
     );
   };
 
-  const canSubmit = name.trim() && team.trim();
+  const canSubmit = !!name.trim() && !!team.trim() && !usernameTaken;
 
   const handleSubmit = () => {
     if (!canSubmit) return;
-    onSubmit({ name: name.trim(), team: team.trim(), role, positions, active });
+    onSubmit({
+      name: name.trim(),
+      team: team.trim(),
+      role,
+      positions,
+      active,
+      ...(canEditCredentials ? { username: trimmedUsername } : {}),
+      ...(canEditCredentials && password ? { password } : {}),
+    });
   };
 
   return (
@@ -107,6 +131,23 @@ export function EmployeeFormModal({
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
+        {canEditCredentials && (
+          <>
+            <Input
+              label="아이디"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              error={usernameTaken ? "이미 사용 중인 아이디입니다." : undefined}
+            />
+            <Input
+              label="비밀번호"
+              type="password"
+              placeholder={initial ? "변경 시에만 입력" : undefined}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </>
+        )}
         <Select
           label="팀"
           value={team || null}

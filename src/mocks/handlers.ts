@@ -22,6 +22,7 @@ import type { AuthUser, PositionCode } from "@/features/auth/permissions";
 import { createInitialEmployees } from "@/features/employees/api/mock-data";
 import type {
   CreateEmployeeInput,
+  EmployeeRecord,
   UpdateEmployeeInput,
 } from "@/features/employees/types";
 import {
@@ -191,10 +192,23 @@ export function resetWorkflowsForTest() {
   workflows = [];
 }
 
-let employees: AuthUser[] = asArray(
+let employees: EmployeeRecord[] = asArray(
   persisted.employees,
   createInitialEmployees,
 );
+
+/** password는 mock 저장소 내부에만 두고 클라이언트 응답에서는 제외한다. */
+function toPublicEmployee(record: EmployeeRecord): AuthUser {
+  return {
+    id: record.id,
+    name: record.name,
+    team: record.team,
+    role: record.role,
+    positions: record.positions,
+    active: record.active,
+    username: record.username,
+  };
+}
 
 /** 테스트에서 mock 데이터 상태를 시드 값으로 되돌리기 위한 헬퍼. 프로덕션 코드에서는 사용하지 않는다. */
 export function resetEmployeesForTest() {
@@ -934,22 +948,24 @@ export const handlers = [
   }),
 
   http.get("/api/employees", () => {
-    return HttpResponse.json(employees);
+    return HttpResponse.json(employees.map(toPublicEmployee));
   }),
 
   http.post("/api/employees", async ({ request }) => {
     const input = (await request.json()) as CreateEmployeeInput;
-    const created: AuthUser = {
+    const created: EmployeeRecord = {
       id: `emp-${Date.now()}`,
       name: input.name,
       team: input.team,
       role: input.role,
       positions: input.positions ?? [],
       active: input.active ?? true,
+      username: input.username ?? "",
+      password: input.password ?? "",
     };
     employees = [...employees, created];
     persistMockDb();
-    return HttpResponse.json(created, { status: 201 });
+    return HttpResponse.json(toPublicEmployee(created), { status: 201 });
   }),
 
   http.patch("/api/employees/:id", async ({ params, request }) => {
@@ -959,10 +975,35 @@ export const handlers = [
       return new HttpResponse(null, { status: 404 });
     }
     const patch = (await request.json()) as UpdateEmployeeInput;
-    const updated: AuthUser = { ...target, ...patch };
+    const updated: EmployeeRecord = {
+      ...target,
+      ...patch,
+      password: patch.password || target.password,
+    };
     employees = employees.map((e) => (e.id === id ? updated : e));
     persistMockDb();
-    return HttpResponse.json(updated);
+    return HttpResponse.json(toPublicEmployee(updated));
+  }),
+
+  http.post("/api/auth/login", async ({ request }) => {
+    const { username, password } = (await request.json()) as {
+      username: string;
+      password: string;
+    };
+    const matched = employees.find(
+      (e) =>
+        e.active &&
+        e.username &&
+        e.username === username &&
+        e.password === password,
+    );
+    if (!matched) {
+      return HttpResponse.json(
+        { error: "아이디 또는 비밀번호가 올바르지 않습니다." },
+        { status: 401 },
+      );
+    }
+    return HttpResponse.json(toPublicEmployee(matched));
   }),
 
   http.delete("/api/employees/:id", ({ params }) => {

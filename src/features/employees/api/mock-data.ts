@@ -1,10 +1,15 @@
-import type { AuthUser } from "@/features/auth/permissions";
+import type { EmployeeRecord } from "@/features/employees/types";
+
+/** 초기 계정 공통 비밀번호. mock 전용 데모 값이며 실제 배포 전 백엔드 인증으로 교체된다. */
+const DEFAULT_PASSWORD = "1234";
 
 /** 초기 직원 계정. 실제 조직도 성격의 데이터라 데모 고객 데이터와 달리 비우지 않는다. */
-export function createInitialEmployees(): AuthUser[] {
+export function createInitialEmployees(): EmployeeRecord[] {
   return [
     {
       id: "admin",
+      username: "admin",
+      password: DEFAULT_PASSWORD,
       name: "관리자",
       team: "운영관리",
       role: "admin",
@@ -13,6 +18,8 @@ export function createInitialEmployees(): AuthUser[] {
     },
     {
       id: "master",
+      username: "master",
+      password: DEFAULT_PASSWORD,
       name: "김마스터",
       team: "운영관리",
       role: "viewer",
@@ -21,6 +28,8 @@ export function createInitialEmployees(): AuthUser[] {
     },
     {
       id: "cs-manager",
+      username: "cs-manager",
+      password: DEFAULT_PASSWORD,
       name: "정지은 매니저",
       team: "CS팀",
       role: "cs",
@@ -29,6 +38,8 @@ export function createInitialEmployees(): AuthUser[] {
     },
     {
       id: "cs-responsible",
+      username: "cs-responsible",
+      password: DEFAULT_PASSWORD,
       name: "서지은 책임매니저",
       team: "CS팀",
       role: "cs",
@@ -37,6 +48,8 @@ export function createInitialEmployees(): AuthUser[] {
     },
     {
       id: "cs-lead",
+      username: "cs-lead",
+      password: DEFAULT_PASSWORD,
       name: "한소라 팀장",
       team: "CS팀",
       role: "cs",
@@ -45,6 +58,8 @@ export function createInitialEmployees(): AuthUser[] {
     },
     {
       id: "tech-manager",
+      username: "tech-manager",
+      password: DEFAULT_PASSWORD,
       name: "박기사 매니저",
       team: "기술지원팀",
       role: "tech",
@@ -53,6 +68,8 @@ export function createInitialEmployees(): AuthUser[] {
     },
     {
       id: "tech-responsible",
+      username: "tech-responsible",
+      password: DEFAULT_PASSWORD,
       name: "이기사 책임매니저",
       team: "기술지원팀",
       role: "tech",
@@ -61,6 +78,8 @@ export function createInitialEmployees(): AuthUser[] {
     },
     {
       id: "tech-lead",
+      username: "tech-lead",
+      password: DEFAULT_PASSWORD,
       name: "최기사 팀장",
       team: "기술지원팀",
       role: "tech",
@@ -69,6 +88,8 @@ export function createInitialEmployees(): AuthUser[] {
     },
     {
       id: "viewer",
+      username: "viewer",
+      password: DEFAULT_PASSWORD,
       name: "조회 전용",
       team: "감사",
       role: "viewer",

@@ -1,40 +1,46 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { LogInIcon } from "lucide-react";
 import { LogoMark } from "@/components/layout/logo-mark";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/auth-provider";
-import { roleLabel, positionLabel } from "@/features/auth/permissions";
-import type { AuthUser, UserRole } from "@/features/auth/permissions";
-import { useEmployees } from "@/features/employees/hooks/use-employees";
-
-const ROLE_DESCRIPTION: Record<UserRole, string> = {
-  admin: "전체 메뉴와 권한 관리 화면을 사용할 수 있습니다.",
-  cs: "가맹 접수, 변경 관리, 우국상, 인터넷 관리를 사용할 수 있습니다.",
-  tech: "설치 관리와 매장 운영 이력을 사용할 수 있습니다.",
-  viewer: "운영 화면을 조회 전용으로 확인합니다.",
-};
+import { login as loginRequest } from "@/features/auth/api/auth-api";
 
 export function LoginPage() {
   const router = useRouter();
   const { ready, user, login } = useAuth();
-  const { loading, employees } = useEmployees();
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (ready && user) router.replace("/");
   }, [ready, router, user]);
 
-  const handleLogin = (employee: AuthUser) => {
-    login(employee);
-    router.replace("/");
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      const authUser = await loginRequest({
+        username: username.trim(),
+        password,
+      });
+      login(authUser);
+      router.replace("/");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "로그인에 실패했습니다.");
+      setSubmitting(false);
+    }
   };
-
-  const activeEmployees = employees.filter((employee) => employee.active);
 
   return (
     <main className="bg-background flex min-h-dvh flex-1 items-center justify-center p-6">
-      <div className="w-full max-w-[460px]">
+      <div className="w-full max-w-[400px]">
         <div className="mb-6 flex items-center justify-center gap-2">
           <LogoMark className="size-9" />
           <span className="text-foreground text-xl font-bold">POSMOS</span>
@@ -42,40 +48,37 @@ export function LoginPage() {
         <section className="border-border bg-card shadow-card rounded-lg border p-6">
           <h1 className="text-foreground text-xl font-bold">로그인</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            테스트할 계정을 선택해 전산 시스템에 접속합니다.
+            아이디와 비밀번호를 입력해 전산 시스템에 접속합니다.
           </p>
-          <div className="mt-5 flex flex-col gap-2">
-            {loading ? (
-              <p className="text-muted-foreground text-sm">
-                계정 목록을 불러오는 중입니다.
+          <form className="mt-5 flex flex-col gap-3" onSubmit={handleSubmit}>
+            <Input
+              label="아이디"
+              autoComplete="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+            />
+            <Input
+              label="비밀번호"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            {error && (
+              <p role="alert" className="text-error text-xs">
+                {error}
               </p>
-            ) : (
-              activeEmployees.map((employee) => (
-                <button
-                  key={employee.id}
-                  type="button"
-                  onClick={() => handleLogin(employee)}
-                  className="border-border hover:border-primary/50 hover:bg-surface-subtle flex items-center justify-between gap-4 rounded-lg border px-4 py-3 text-left"
-                >
-                  <span>
-                    <span className="text-foreground block text-sm font-bold">
-                      {employee.name}
-                    </span>
-                    <span className="text-muted-foreground mt-1 block text-xs">
-                      {employee.team} · {roleLabel(employee.role)}
-                      {employee.positions.length > 0
-                        ? ` · ${employee.positions.map(positionLabel).join(", ")}`
-                        : ""}
-                    </span>
-                    <span className="text-muted-foreground mt-1 block text-xs">
-                      {ROLE_DESCRIPTION[employee.role]}
-                    </span>
-                  </span>
-                  <LogInIcon className="text-primary size-4 shrink-0" />
-                </button>
-              ))
             )}
-          </div>
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={!username.trim() || !password || submitting}
+              className="mt-1 justify-center"
+            >
+              <LogInIcon className="size-4" />
+              로그인
+            </Button>
+          </form>
         </section>
       </div>
     </main>

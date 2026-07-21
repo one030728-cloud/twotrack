@@ -3,9 +3,19 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { UsersAdminPage } from "./users-admin-page";
 import { resetEmployeesForTest } from "@/mocks/handlers";
+import { AuthProvider } from "@/features/auth/auth-provider";
+
+function renderPage() {
+  return render(
+    <AuthProvider>
+      <UsersAdminPage />
+    </AuthProvider>,
+  );
+}
 
 beforeEach(() => {
   resetEmployeesForTest();
+  window.localStorage.setItem("posmos-auth-user", "master");
   if (!HTMLDialogElement.prototype.showModal) {
     HTMLDialogElement.prototype.showModal = function (this: HTMLDialogElement) {
       this.setAttribute("open", "");
@@ -21,12 +31,13 @@ beforeEach(() => {
 
 afterEach(() => {
   resetEmployeesForTest();
+  window.localStorage.removeItem("posmos-auth-user");
   vi.restoreAllMocks();
 });
 
 describe("UsersAdminPage", () => {
   it("직원 목록과 직책 배지를 표시한다", async () => {
-    render(<UsersAdminPage />);
+    renderPage();
 
     expect(await screen.findByText("정지은 매니저")).toBeInTheDocument();
     expect(screen.getByText("CS 매니저")).toBeInTheDocument();
@@ -35,7 +46,7 @@ describe("UsersAdminPage", () => {
 
   it("직원 추가 모달에서 새 직원을 등록한다", async () => {
     const user = userEvent.setup();
-    render(<UsersAdminPage />);
+    renderPage();
     await screen.findByText("정지은 매니저");
 
     await user.click(screen.getByRole("button", { name: "직원 추가" }));
@@ -50,7 +61,7 @@ describe("UsersAdminPage", () => {
 
   it("개발팀을 선택하면 마스터 직책이 자동으로 부여되고 해제할 수 없다", async () => {
     const user = userEvent.setup();
-    render(<UsersAdminPage />);
+    renderPage();
     await screen.findByText("정지은 매니저");
 
     await user.click(screen.getByRole("button", { name: "직원 추가" }));
@@ -69,7 +80,7 @@ describe("UsersAdminPage", () => {
 
   it("권한 변경 모달에서 직책을 바꾸면 목록에 반영된다", async () => {
     const user = userEvent.setup();
-    render(<UsersAdminPage />);
+    renderPage();
     const row = (await screen.findByText("정지은 매니저")).closest(
       "div.grid",
     ) as HTMLElement;
@@ -90,7 +101,7 @@ describe("UsersAdminPage", () => {
   it("삭제 버튼을 누르면 확인 후 계정을 제거한다", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     const user = userEvent.setup();
-    render(<UsersAdminPage />);
+    renderPage();
     const row = (await screen.findByText("조회 전용")).closest(
       "div.grid",
     ) as HTMLElement;
@@ -106,7 +117,7 @@ describe("UsersAdminPage", () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
     const user = userEvent.setup();
-    render(<UsersAdminPage />);
+    renderPage();
 
     // 초기 시드에는 admin(role=admin)과 master(position=master) 두 명이 있으므로
     // 먼저 admin을 지우면 master가 남아 있어 정상 삭제된다.
@@ -131,5 +142,37 @@ describe("UsersAdminPage", () => {
 
     await waitFor(() => expect(alertSpy).toHaveBeenCalled());
     expect(screen.getByText("김마스터")).toBeInTheDocument();
+  });
+
+  it("마스터 계정은 직원 추가 시 아이디·비밀번호를 부여할 수 있다", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("정지은 매니저");
+
+    await user.click(screen.getByRole("button", { name: "직원 추가" }));
+    const modal = screen.getByRole("dialog", { name: "직원 추가" });
+    await user.type(within(modal).getByLabelText("이름"), "신규 계정");
+    await user.type(within(modal).getByLabelText("아이디"), "new-account");
+    await user.type(within(modal).getByLabelText("비밀번호"), "pass1234");
+    await user.click(within(modal).getByRole("combobox", { name: "팀" }));
+    await user.click(await screen.findByRole("option", { name: "CS" }));
+    await user.click(within(modal).getByRole("button", { name: "추가" }));
+
+    const row = (await screen.findByText("신규 계정")).closest(
+      "div.grid",
+    ) as HTMLElement;
+    expect(within(row).getByText(/new-account/)).toBeInTheDocument();
+  });
+
+  it("마스터가 아니면 아이디·비밀번호 입력란이 보이지 않는다", async () => {
+    window.localStorage.setItem("posmos-auth-user", "cs-manager");
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("정지은 매니저");
+
+    await user.click(screen.getByRole("button", { name: "직원 추가" }));
+    const modal = screen.getByRole("dialog", { name: "직원 추가" });
+    expect(within(modal).queryByLabelText("아이디")).not.toBeInTheDocument();
+    expect(within(modal).queryByLabelText("비밀번호")).not.toBeInTheDocument();
   });
 });

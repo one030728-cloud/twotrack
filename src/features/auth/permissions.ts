@@ -35,8 +35,15 @@ export interface AuthUser {
   team: string;
   role: UserRole;
   positions: PositionCode[];
-  /** 재직 여부. 비활성 계정은 로그인 목록에서 제외된다. */
+  /** 재직 여부. 비활성 계정은 로그인할 수 없다. */
   active: boolean;
+  /** 로그인 아이디. 마스터 직책 보유자만 부여/변경할 수 있다. */
+  username: string;
+}
+
+/** 마스터 직책 보유 여부. 로그인 계정(아이디·비밀번호) 생성 권한의 기준이 된다. */
+export function isMaster(user: Pick<AuthUser, "positions">): boolean {
+  return user.positions.includes("master");
 }
 
 /** master 직책만 접근 가능한 경로. 일반 admin 역할이라도 master 직책이 없으면 접근할 수 없다. */

@@ -82,6 +82,7 @@ export function UsersAdminPage() {
                 </div>
                 <div className="text-muted-foreground mt-1 text-xs">
                   {employee.team}
+                  {employee.username ? ` · ${employee.username}` : ""}
                 </div>
               </div>
               <Badge>{roleLabel(employee.role)}</Badge>
@@ -129,6 +130,9 @@ export function UsersAdminPage() {
         <EmployeeFormModal
           title="직원 추가"
           submitLabel="추가"
+          existingUsernames={employees
+            .map((e) => e.username)
+            .filter((u): u is string => !!u)}
           onClose={() => setAddOpen(false)}
           onSubmit={handleAdd}
         />
@@ -139,6 +143,10 @@ export function UsersAdminPage() {
           title={`${editTarget.name} 권한 변경`}
           submitLabel="저장"
           initial={editTarget}
+          existingUsernames={employees
+            .filter((e) => e.id !== editTarget.id)
+            .map((e) => e.username)
+            .filter((u): u is string => !!u)}
           onClose={() => setEditTarget(null)}
           onSubmit={handleEdit}
         />
