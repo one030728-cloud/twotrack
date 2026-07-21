@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/features/auth/auth-provider";
+import type { PositionCode } from "@/features/auth/permissions";
 import {
   approveWorkflow,
   fetchWorkflow,
@@ -40,26 +41,32 @@ export function useApprovalWorkflow(kind: WorkflowKind, entityId: number) {
 
   const domain = domainForKind(kind);
   const positions = user?.positions ?? [];
-  const isCorrectDomain = user?.role === domain;
+  const hasAny = (candidates: PositionCode[]) =>
+    candidates.some((p) => positions.includes(p));
   const isRequester = !!user && workflow?.requestedBy === user.id;
+
+  const requestPositions: PositionCode[] =
+    domain === "cs" ? ["cs_manager", "master"] : ["tech_manager", "master"];
+  const responsiblePositions: PositionCode[] =
+    domain === "cs"
+      ? ["cs_responsible", "master"]
+      : ["tech_responsible", "master"];
+  const teamLeadPositions: PositionCode[] = ["team_lead", "master"];
 
   const canRequest =
     !!user &&
-    isCorrectDomain &&
-    positions.includes("manager") &&
+    hasAny(requestPositions) &&
     (!workflow || workflow.stage === "rejected");
 
   const canApproveResponsible =
     !!user &&
-    isCorrectDomain &&
-    positions.includes("responsible_manager") &&
+    hasAny(responsiblePositions) &&
     workflow?.stage === "manager_requested" &&
     !isRequester;
 
   const canApproveTeamLead =
     !!user &&
-    isCorrectDomain &&
-    positions.includes("team_lead") &&
+    hasAny(teamLeadPositions) &&
     workflow?.stage === "responsible_approved" &&
     !isRequester;
 

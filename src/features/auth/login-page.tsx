@@ -5,12 +5,9 @@ import { useRouter } from "next/navigation";
 import { LogInIcon } from "lucide-react";
 import { LogoMark } from "@/components/layout/logo-mark";
 import { useAuth } from "@/features/auth/auth-provider";
-import {
-  MOCK_USERS,
-  roleLabel,
-  positionLabel,
-  type UserRole,
-} from "@/features/auth/permissions";
+import { roleLabel, positionLabel } from "@/features/auth/permissions";
+import type { AuthUser, UserRole } from "@/features/auth/permissions";
+import { useEmployees } from "@/features/employees/hooks/use-employees";
 
 const ROLE_DESCRIPTION: Record<UserRole, string> = {
   admin: "전체 메뉴와 권한 관리 화면을 사용할 수 있습니다.",
@@ -22,15 +19,18 @@ const ROLE_DESCRIPTION: Record<UserRole, string> = {
 export function LoginPage() {
   const router = useRouter();
   const { ready, user, login } = useAuth();
+  const { loading, employees } = useEmployees();
 
   useEffect(() => {
     if (ready && user) router.replace("/");
   }, [ready, router, user]);
 
-  const handleLogin = (userId: string) => {
-    login(userId);
+  const handleLogin = (employee: AuthUser) => {
+    login(employee);
     router.replace("/");
   };
+
+  const activeEmployees = employees.filter((employee) => employee.active);
 
   return (
     <main className="bg-background flex min-h-dvh flex-1 items-center justify-center p-6">
@@ -45,30 +45,36 @@ export function LoginPage() {
             테스트할 계정을 선택해 전산 시스템에 접속합니다.
           </p>
           <div className="mt-5 flex flex-col gap-2">
-            {MOCK_USERS.map((mockUser) => (
-              <button
-                key={mockUser.id}
-                type="button"
-                onClick={() => handleLogin(mockUser.id)}
-                className="border-border hover:border-primary/50 hover:bg-surface-subtle flex items-center justify-between gap-4 rounded-lg border px-4 py-3 text-left"
-              >
-                <span>
-                  <span className="text-foreground block text-sm font-bold">
-                    {mockUser.name}
+            {loading ? (
+              <p className="text-muted-foreground text-sm">
+                계정 목록을 불러오는 중입니다.
+              </p>
+            ) : (
+              activeEmployees.map((employee) => (
+                <button
+                  key={employee.id}
+                  type="button"
+                  onClick={() => handleLogin(employee)}
+                  className="border-border hover:border-primary/50 hover:bg-surface-subtle flex items-center justify-between gap-4 rounded-lg border px-4 py-3 text-left"
+                >
+                  <span>
+                    <span className="text-foreground block text-sm font-bold">
+                      {employee.name}
+                    </span>
+                    <span className="text-muted-foreground mt-1 block text-xs">
+                      {employee.team} · {roleLabel(employee.role)}
+                      {employee.positions.length > 0
+                        ? ` · ${employee.positions.map(positionLabel).join(", ")}`
+                        : ""}
+                    </span>
+                    <span className="text-muted-foreground mt-1 block text-xs">
+                      {ROLE_DESCRIPTION[employee.role]}
+                    </span>
                   </span>
-                  <span className="text-muted-foreground mt-1 block text-xs">
-                    {mockUser.team} · {roleLabel(mockUser.role)}
-                    {mockUser.positions.length > 0
-                      ? ` · ${mockUser.positions.map(positionLabel).join(", ")}`
-                      : ""}
-                  </span>
-                  <span className="text-muted-foreground mt-1 block text-xs">
-                    {ROLE_DESCRIPTION[mockUser.role]}
-                  </span>
-                </span>
-                <LogInIcon className="text-primary size-4 shrink-0" />
-              </button>
-            ))}
+                  <LogInIcon className="text-primary size-4 shrink-0" />
+                </button>
+              ))
+            )}
           </div>
         </section>
       </div>

@@ -38,7 +38,7 @@ function makeWorkflow(
         action: "request",
         actorId: "cs-manager",
         actorName: "정지은 매니저",
-        actorPosition: "manager",
+        actorPosition: "cs_manager",
         comment: "",
         createdAt: "2026-07-17T10:00:00.000Z",
       },

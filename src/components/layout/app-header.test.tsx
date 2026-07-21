@@ -26,6 +26,7 @@ function renderHeader(auth = {}) {
       team: "CS팀",
       role: "cs",
       positions: [],
+      active: true,
     },
     login: vi.fn(),
     logout: vi.fn(),

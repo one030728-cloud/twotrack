@@ -18,11 +18,17 @@ import {
   createFixtureInstalls,
   createInitialInstalls,
 } from "@/features/installations/api/mock-data";
-import { MOCK_USERS, type PositionCode } from "@/features/auth/permissions";
+import type { AuthUser, PositionCode } from "@/features/auth/permissions";
+import { createInitialEmployees } from "@/features/employees/api/mock-data";
+import type {
+  CreateEmployeeInput,
+  UpdateEmployeeInput,
+} from "@/features/employees/types";
 import {
   domainForKind,
   type ApprovalWorkflow,
   type WorkflowActionEntry,
+  type WorkflowDomain,
   type WorkflowKind,
   type WorkflowStage,
 } from "@/features/workflow/types";
@@ -100,6 +106,13 @@ let workflows: ApprovalWorkflow[] = [];
 /** 테스트에서 mock 데이터 상태를 시드 값으로 되돌리기 위한 헬퍼. 프로덕션 코드에서는 사용하지 않는다. */
 export function resetWorkflowsForTest() {
   workflows = [];
+}
+
+let employees: AuthUser[] = createInitialEmployees();
+
+/** 테스트에서 mock 데이터 상태를 시드 값으로 되돌리기 위한 헬퍼. 프로덕션 코드에서는 사용하지 않는다. */
+export function resetEmployeesForTest() {
+  employees = createInitialEmployees();
 }
 
 /** 가맹 접수 건을 기술지원팀 설치관리로 이관하는 부수효과. 승인 워크플로우의 팀장 최종수락 시 호출된다. */
@@ -208,13 +221,35 @@ function performInstallCompletion(id: number) {
   return updated;
 }
 
-const REQUIRED_POSITION_BY_STAGE: Record<
-  "manager_requested" | "responsible_approved",
-  PositionCode
-> = {
-  manager_requested: "responsible_manager",
-  responsible_approved: "team_lead",
-};
+/** 요청 단계에서 필요한 직책. master는 어느 도메인이든 대행 가능하다. */
+function positionsForRequest(domain: WorkflowDomain): PositionCode[] {
+  return domain === "cs"
+    ? ["cs_manager", "master"]
+    : ["tech_manager", "master"];
+}
+
+/** 책임매니저 승인 단계에서 필요한 직책. */
+function positionsForResponsibleApprove(
+  domain: WorkflowDomain,
+): PositionCode[] {
+  return domain === "cs"
+    ? ["cs_responsible", "master"]
+    : ["tech_responsible", "master"];
+}
+
+/** 팀장 최종수락 단계는 도메인과 무관하게 공통 팀장 직책이 담당한다. */
+function positionsForTeamLeadApprove(): PositionCode[] {
+  return ["team_lead", "master"];
+}
+
+function positionsForStage(
+  stage: "manager_requested" | "responsible_approved",
+  domain: WorkflowDomain,
+): PositionCode[] {
+  return stage === "manager_requested"
+    ? positionsForResponsibleApprove(domain)
+    : positionsForTeamLeadApprove();
+}
 
 function findLatestWorkflow(kind: WorkflowKind, entityId: number) {
   return workflows
@@ -391,13 +426,13 @@ export const handlers = [
       actorId: string;
       payload?: PendingCompletion;
     };
-    const actor = MOCK_USERS.find((u) => u.id === body.actorId);
+    const actor = employees.find((u) => u.id === body.actorId);
     const domain = domainForKind(body.kind);
-    if (
-      !actor ||
-      actor.role !== domain ||
-      !actor.positions.includes("manager")
-    ) {
+    const allowedPositions = positionsForRequest(domain);
+    const matchedPosition = actor?.positions.find((p) =>
+      allowedPositions.includes(p),
+    );
+    if (!actor || !matchedPosition) {
       return new HttpResponse(null, { status: 403 });
     }
     const existing = findLatestWorkflow(body.kind, body.entityId);
@@ -419,7 +454,7 @@ export const handlers = [
       action: "request",
       actorId: actor.id,
       actorName: actor.name,
-      actorPosition: "manager",
+      actorPosition: matchedPosition,
       comment: "",
       createdAt: now,
     };
@@ -448,16 +483,19 @@ export const handlers = [
       actorId: string;
       comment?: string;
     };
-    const actor = MOCK_USERS.find((u) => u.id === body.actorId);
-    const requiredPosition =
-      REQUIRED_POSITION_BY_STAGE[
-        workflow.stage as "manager_requested" | "responsible_approved"
-      ];
+    const actor = employees.find((u) => u.id === body.actorId);
+    const allowedPositions =
+      workflow.stage === "manager_requested" ||
+      workflow.stage === "responsible_approved"
+        ? positionsForStage(workflow.stage, workflow.domain)
+        : null;
+    const matchedPosition = actor?.positions.find((p) =>
+      allowedPositions?.includes(p),
+    );
     if (
       !actor ||
-      !requiredPosition ||
-      actor.role !== workflow.domain ||
-      !actor.positions.includes(requiredPosition) ||
+      !allowedPositions ||
+      !matchedPosition ||
       actor.id === workflow.requestedBy
     ) {
       return new HttpResponse(null, { status: 403 });
@@ -476,7 +514,7 @@ export const handlers = [
           : "team_lead_approve",
       actorId: actor.id,
       actorName: actor.name,
-      actorPosition: requiredPosition,
+      actorPosition: matchedPosition,
       comment: body.comment ?? "",
       createdAt: now,
     };
@@ -508,16 +546,19 @@ export const handlers = [
       actorId: string;
       reason: string;
     };
-    const actor = MOCK_USERS.find((u) => u.id === body.actorId);
-    const requiredPosition =
-      REQUIRED_POSITION_BY_STAGE[
-        workflow.stage as "manager_requested" | "responsible_approved"
-      ];
+    const actor = employees.find((u) => u.id === body.actorId);
+    const allowedPositions =
+      workflow.stage === "manager_requested" ||
+      workflow.stage === "responsible_approved"
+        ? positionsForStage(workflow.stage, workflow.domain)
+        : null;
+    const matchedPosition = actor?.positions.find((p) =>
+      allowedPositions?.includes(p),
+    );
     if (
       !actor ||
-      !requiredPosition ||
-      actor.role !== workflow.domain ||
-      !actor.positions.includes(requiredPosition) ||
+      !allowedPositions ||
+      !matchedPosition ||
       actor.id === workflow.requestedBy ||
       !body.reason?.trim()
     ) {
@@ -530,7 +571,7 @@ export const handlers = [
       action: "reject",
       actorId: actor.id,
       actorName: actor.name,
-      actorPosition: requiredPosition,
+      actorPosition: matchedPosition,
       comment: body.reason,
       createdAt: now,
     };
@@ -548,5 +589,45 @@ export const handlers = [
     }
 
     return HttpResponse.json(updated);
+  }),
+
+  http.get("/api/employees", () => {
+    return HttpResponse.json(employees);
+  }),
+
+  http.post("/api/employees", async ({ request }) => {
+    const input = (await request.json()) as CreateEmployeeInput;
+    const created: AuthUser = {
+      id: `emp-${Date.now()}`,
+      name: input.name,
+      team: input.team,
+      role: input.role,
+      positions: input.positions ?? [],
+      active: input.active ?? true,
+    };
+    employees = [...employees, created];
+    return HttpResponse.json(created, { status: 201 });
+  }),
+
+  http.patch("/api/employees/:id", async ({ params, request }) => {
+    const id = params.id as string;
+    const target = employees.find((e) => e.id === id);
+    if (!target) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    const patch = (await request.json()) as UpdateEmployeeInput;
+    const updated: AuthUser = { ...target, ...patch };
+    employees = employees.map((e) => (e.id === id ? updated : e));
+    return HttpResponse.json(updated);
+  }),
+
+  http.delete("/api/employees/:id", ({ params }) => {
+    const id = params.id as string;
+    const target = employees.find((e) => e.id === id);
+    if (!target) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    employees = employees.filter((e) => e.id !== id);
+    return new HttpResponse(null, { status: 204 });
   }),
 ];

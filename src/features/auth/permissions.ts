@@ -1,7 +1,27 @@
 export type UserRole = "admin" | "cs" | "tech" | "viewer";
 
-/** 승인 워크플로우 전용 직책. 계정 역할(UserRole)과 분리된 별도 임명 개념. */
-export type PositionCode = "manager" | "responsible_manager" | "team_lead";
+/**
+ * 승인 워크플로우 전용 직책. 계정 역할(UserRole)과 분리된 별도 임명 개념.
+ * cs_manager/cs_responsible, tech_manager/tech_responsible는 팀별로 분리된 직책이고,
+ * team_lead는 CS/기술지원 두 도메인을 모두 최종수락하는 공통 직책이다.
+ * master는 직원 관리 접근 + 전 단계 승인을 대행할 수 있는 최상위 직책이다.
+ */
+export type PositionCode =
+  | "cs_manager"
+  | "cs_responsible"
+  | "tech_manager"
+  | "tech_responsible"
+  | "team_lead"
+  | "master";
+
+export const POSITION_OPTIONS: { value: PositionCode; label: string }[] = [
+  { value: "cs_manager", label: "CS 매니저" },
+  { value: "cs_responsible", label: "CS 책임매니저" },
+  { value: "tech_manager", label: "기술지원 매니저" },
+  { value: "tech_responsible", label: "기술지원 책임매니저" },
+  { value: "team_lead", label: "팀장" },
+  { value: "master", label: "마스터" },
+];
 
 export interface AuthUser {
   id: string;
@@ -9,66 +29,9 @@ export interface AuthUser {
   team: string;
   role: UserRole;
   positions: PositionCode[];
+  /** 재직 여부. 비활성 계정은 로그인 목록에서 제외된다. */
+  active: boolean;
 }
-
-export const MOCK_USERS: AuthUser[] = [
-  {
-    id: "admin",
-    name: "관리자",
-    team: "운영관리",
-    role: "admin",
-    positions: [],
-  },
-  {
-    id: "cs-manager",
-    name: "정지은 매니저",
-    team: "CS팀",
-    role: "cs",
-    positions: ["manager"],
-  },
-  {
-    id: "cs-responsible",
-    name: "서지은 책임매니저",
-    team: "CS팀",
-    role: "cs",
-    positions: ["responsible_manager"],
-  },
-  {
-    id: "cs-lead",
-    name: "한소라 팀장",
-    team: "CS팀",
-    role: "cs",
-    positions: ["team_lead"],
-  },
-  {
-    id: "tech-manager",
-    name: "박기사 매니저",
-    team: "기술지원팀",
-    role: "tech",
-    positions: ["manager"],
-  },
-  {
-    id: "tech-responsible",
-    name: "이기사 책임매니저",
-    team: "기술지원팀",
-    role: "tech",
-    positions: ["responsible_manager"],
-  },
-  {
-    id: "tech-lead",
-    name: "최기사 팀장",
-    team: "기술지원팀",
-    role: "tech",
-    positions: ["team_lead"],
-  },
-  {
-    id: "viewer",
-    name: "조회 전용",
-    team: "감사",
-    role: "viewer",
-    positions: [],
-  },
-];
 
 const CS_PATHS = ["/franchise-receipts", "/changes", "/woo", "/internet"];
 const TECH_PATHS = ["/installs", "/stores"];
@@ -79,11 +42,17 @@ function matchesAny(pathname: string, paths: string[]) {
   );
 }
 
-export function canAccessPath(role: UserRole, pathname: string): boolean {
+export function canAccessPath(
+  role: UserRole,
+  pathname: string,
+  positions: PositionCode[] = [],
+): boolean {
   if (pathname === "/login") return true;
   if (pathname === "/") return true;
   if (role === "admin") return true;
-  if (role === "viewer") {
+  if (positions.includes("master")) return true;
+  const crossTeam = positions.includes("team_lead");
+  if (role === "viewer" || crossTeam) {
     return matchesAny(pathname, [...CS_PATHS, ...TECH_PATHS]);
   }
   if (role === "cs") return matchesAny(pathname, CS_PATHS);
@@ -105,12 +74,5 @@ export function roleLabel(role: UserRole) {
 }
 
 export function positionLabel(position: PositionCode) {
-  switch (position) {
-    case "manager":
-      return "매니저";
-    case "responsible_manager":
-      return "책임매니저";
-    case "team_lead":
-      return "팀장";
-  }
+  return POSITION_OPTIONS.find((option) => option.value === position)!.label;
 }

@@ -17,7 +17,14 @@ vi.mock("@/features/auth/auth-provider", () => ({
 function mockRole(role: UserRole) {
   vi.mocked(useAuth).mockReturnValue({
     ready: true,
-    user: { id: role, name: role, team: role, role, positions: [] },
+    user: {
+      id: role,
+      name: role,
+      team: role,
+      role,
+      positions: [],
+      active: true,
+    },
     login: vi.fn(),
     logout: vi.fn(),
     canAccess: (pathname: string) => canAccessPath(role, pathname),
