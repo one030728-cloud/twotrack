@@ -3,10 +3,9 @@
 import { useEffect, useState } from "react";
 
 export function MswProvider({ children }: { children: React.ReactNode }) {
-  const [ready, setReady] = useState(process.env.NODE_ENV !== "development");
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (process.env.NODE_ENV !== "development") return;
     import("./browser").then(({ worker }) =>
       worker.start({ onUnhandledRequest: "bypass" }).then(() => setReady(true)),
     );
