@@ -1,0 +1,90 @@
+@import "tailwindcss";
+@import "pretendard/dist/web/static/pretendard.css";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --border: #e2e8f0;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --primary-foreground: #ffffff;
+  --primary-muted: #eff6ff;
+  --error: #dc2626;
+  --error-foreground: #ffffff;
+  --border-strong: #cbd5e1;
+  --surface-subtle: #f6f8fb;
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.04);
+  --shadow-sidebar: 1px 0 3px rgb(15 23 42 / 0.04);
+}
+
+[data-theme="dark"] {
+  /* 슬레이트(파란기 회색) 대신 zinc 무채색 계열로 구성해 순수 블랙+그레이 톤을 유지한다.
+     brand 색(primary)만 에메랄드 계열로 바꿔서 블랙+zinc 베이스와 어울리게 한다. */
+  --background: #09090b;
+  --foreground: #fafafa;
+  --card: #18181b;
+  --border: #27272a;
+  --muted: #3f3f46;
+  --muted-foreground: #a1a1aa;
+  --primary: #0d9488;
+  --primary-hover: #14b8a6;
+  --primary-foreground: #ffffff;
+  --primary-muted: #042f2e;
+  --error: #ef4444;
+  --error-foreground: #ffffff;
+  --border-strong: #52525b;
+  --surface-subtle: #141416;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.5);
+  --shadow-sidebar: 1px 0 3px rgb(0 0 0 / 0.4);
+}
+
+[data-theme="pink"] {
+  /* 라이트 테마의 표면 토큰은 그대로 두고 brand 색(primary)만 핑크로 치환한다. */
+  --primary: #db2777;
+  --primary-hover: #be185d;
+  --primary-foreground: #ffffff;
+  --primary-muted: #ffb0dd;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-border: var(--border);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-muted: var(--primary-muted);
+  --color-error: var(--error);
+  --color-error-foreground: var(--error-foreground);
+  --color-border-strong: var(--border-strong);
+  --color-surface-subtle: var(--surface-subtle);
+  --shadow-card: var(--shadow-card);
+  --shadow-sidebar: var(--shadow-sidebar);
+  --font-sans: "Pretendard", -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+@layer base {
+  button:not(:disabled),
+  select {
+    cursor: pointer;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  min-width: 320px;
+  text-rendering: optimizeLegibility;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}

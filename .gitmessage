@@ -1,0 +1,10 @@
+prefix: 업무 한 줄 요약(명사형 종결)
+
+* 세부 내용 1(명사형 종결)
+* 세부 내용 2(명사형 종결)
+
+# prefix: feat, fix, chore, docs, style, refactor, perf, test, build, ci, revert
+# 요약과 각 항목은 "~습니다/~했다/~함" 같은 문장형이 아닌 명사형으로 끝낼 것
+# 예) chore: ESLint 및 Prettier 연동
+#     * eslint-config-prettier 추가
+#     * .prettierrc.json 설정 추가
