@@ -17,6 +17,9 @@ export interface PersistedMockDb {
   externalTechs?: unknown;
   inventoryItems?: unknown;
   transfers?: unknown;
+  chatMessages?: unknown;
+  contracts?: unknown;
+  slackMessages?: unknown;
 }
 
 function getStorage(): Storage | null {

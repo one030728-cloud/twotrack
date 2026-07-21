@@ -77,6 +77,31 @@ import {
   createFixtureTransfers,
   createInitialTransfers,
 } from "@/features/transfers/api/mock-data";
+import type {
+  ChatMessage,
+  CreateChatMessageInput,
+} from "@/features/chat/types";
+import {
+  createFixtureChatMessages,
+  createInitialChatMessages,
+} from "@/features/chat/api/mock-data";
+import type {
+  ContractRecord,
+  CreateContractInput,
+  UpdateContractInput,
+} from "@/features/contracts/types";
+import {
+  createFixtureContracts,
+  createInitialContracts,
+} from "@/features/contracts/api/mock-data";
+import type {
+  CreateSlackMessageInput,
+  SlackMessageRecord,
+} from "@/features/slack/types";
+import {
+  createFixtureSlackMessages,
+  createInitialSlackMessages,
+} from "@/features/slack/api/mock-data";
 import { asArray, loadPersistedDb, savePersistedDb } from "./persisted-store";
 
 /** 테스트 전용 목업 픽스처. 실제 앱 초기 데이터로는 사용하지 않는다. */
@@ -226,6 +251,36 @@ export function resetTransfersForTest() {
   transfers = createFixtureTransfers();
 }
 
+let chatMessages: ChatMessage[] = asArray(
+  persisted.chatMessages,
+  createInitialChatMessages,
+);
+
+/** 테스트에서 mock 데이터 상태를 시드 값으로 되돌리기 위한 헬퍼. 프로덕션 코드에서는 사용하지 않는다. */
+export function resetChatMessagesForTest() {
+  chatMessages = createFixtureChatMessages();
+}
+
+let contracts: ContractRecord[] = asArray(
+  persisted.contracts,
+  createInitialContracts,
+);
+
+/** 테스트에서 mock 데이터 상태를 시드 값으로 되돌리기 위한 헬퍼. 프로덕션 코드에서는 사용하지 않는다. */
+export function resetContractsForTest() {
+  contracts = createFixtureContracts();
+}
+
+let slackMessages: SlackMessageRecord[] = asArray(
+  persisted.slackMessages,
+  createInitialSlackMessages,
+);
+
+/** 테스트에서 mock 데이터 상태를 시드 값으로 되돌리기 위한 헬퍼. 프로덕션 코드에서는 사용하지 않는다. */
+export function resetSlackMessagesForTest() {
+  slackMessages = createFixtureSlackMessages();
+}
+
 /** 상태 변경 후 호출해 localStorage 스냅샷을 갱신한다. 새로고침 후에도 데이터가 유지되도록 한다. */
 function persistMockDb() {
   savePersistedDb({
@@ -239,6 +294,9 @@ function persistMockDb() {
     externalTechs,
     inventoryItems,
     transfers,
+    chatMessages,
+    contracts,
+    slackMessages,
   });
 }
 
@@ -544,6 +602,12 @@ export const handlers = [
     installs = installs.filter((r) => r.id !== id);
     persistMockDb();
     return new HttpResponse(null, { status: 204 });
+  }),
+
+  http.get("/api/workflows/all", () => {
+    return HttpResponse.json(
+      [...workflows].sort((a, b) => b.requestedAt.localeCompare(a.requestedAt)),
+    );
   }),
 
   http.get("/api/workflows", ({ request }) => {
@@ -1149,5 +1213,101 @@ export const handlers = [
     transfers = transfers.filter((t) => t.id !== id);
     persistMockDb();
     return new HttpResponse(null, { status: 204 });
+  }),
+
+  http.get("/api/chat-messages", () => {
+    return HttpResponse.json(chatMessages);
+  }),
+
+  http.post("/api/chat-messages", async ({ request }) => {
+    const body = (await request.json()) as CreateChatMessageInput & {
+      actorId: string;
+    };
+    const actor = employees.find((u) => u.id === body.actorId);
+    if (!actor) {
+      return new HttpResponse(null, { status: 403 });
+    }
+    const created: ChatMessage = {
+      id: `chat-${Date.now()}`,
+      channelId: body.channelId,
+      authorId: actor.id,
+      authorName: actor.name,
+      content: body.content,
+      createdAt: new Date().toISOString(),
+    };
+    chatMessages = [...chatMessages, created];
+    persistMockDb();
+    return HttpResponse.json(created, { status: 201 });
+  }),
+
+  http.get("/api/contracts", () => {
+    return HttpResponse.json(contracts);
+  }),
+
+  http.post("/api/contracts", async ({ request }) => {
+    const input = (await request.json()) as CreateContractInput;
+    const created: ContractRecord = {
+      id: `contract-${Date.now()}`,
+      merchantName: input.merchantName,
+      ownerName: input.ownerName,
+      phone: input.phone,
+      fileName: input.fileName ?? `${input.merchantName}_가맹계약서.pdf`,
+      status: input.status ?? "draft",
+      sentAt: input.sentAt ?? null,
+      signedAt: input.signedAt ?? null,
+      memo: input.memo ?? "",
+    };
+    contracts = [created, ...contracts];
+    persistMockDb();
+    return HttpResponse.json(created, { status: 201 });
+  }),
+
+  http.patch("/api/contracts/:id", async ({ params, request }) => {
+    const id = params.id as string;
+    const target = contracts.find((c) => c.id === id);
+    if (!target) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    const patch = (await request.json()) as UpdateContractInput;
+    const updated: ContractRecord = { ...target, ...patch };
+    contracts = contracts.map((c) => (c.id === id ? updated : c));
+    persistMockDb();
+    return HttpResponse.json(updated);
+  }),
+
+  http.delete("/api/contracts/:id", ({ params }) => {
+    const id = params.id as string;
+    const target = contracts.find((c) => c.id === id);
+    if (!target) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    contracts = contracts.filter((c) => c.id !== id);
+    persistMockDb();
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  http.get("/api/slack-messages", () => {
+    return HttpResponse.json(slackMessages);
+  }),
+
+  http.post("/api/slack-messages", async ({ request }) => {
+    const body = (await request.json()) as CreateSlackMessageInput & {
+      actorId: string;
+    };
+    const actor = employees.find((u) => u.id === body.actorId);
+    if (!actor) {
+      return new HttpResponse(null, { status: 403 });
+    }
+    const created: SlackMessageRecord = {
+      id: `slack-${Date.now()}`,
+      channel: body.channel,
+      senderId: actor.id,
+      senderName: actor.name,
+      content: body.content,
+      sentAt: new Date().toISOString(),
+    };
+    slackMessages = [...slackMessages, created];
+    persistMockDb();
+    return HttpResponse.json(created, { status: 201 });
   }),
 ];
