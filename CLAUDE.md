@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+@PERFORMANCE.md
+
 ## Project Overview
 
 가맹점의 포스 설치 신청, 가입 대행, 설치 일정 관리를 처리하는 내부 전산 시스템의 프론트엔드.
