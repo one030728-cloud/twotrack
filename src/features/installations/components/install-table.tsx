@@ -230,11 +230,6 @@ export function InstallTable({
         isSelected: (row) => !!selected[row.id],
         onToggleRow: (row) => onToggleRow(row.id),
         rowLabel: (row) => row.customerName,
-        isSelectable: (row) => row.source === "manual",
-        disabledReason: (row) =>
-          row.source === "franchise"
-            ? "가맹 접수 연동 건은 삭제할 수 없어 선택할 수 없습니다"
-            : undefined,
       }}
     />
   );

@@ -596,9 +596,6 @@ export const handlers = [
     if (!target) {
       return new HttpResponse(null, { status: 404 });
     }
-    if (target.source === "franchise") {
-      return new HttpResponse(null, { status: 403 });
-    }
     installs = installs.filter((r) => r.id !== id);
     persistMockDb();
     return new HttpResponse(null, { status: 204 });

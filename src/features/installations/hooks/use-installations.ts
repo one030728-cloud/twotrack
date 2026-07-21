@@ -184,11 +184,7 @@ export function useInstallations() {
     });
   }, []);
 
-  // 가맹 접수에서 넘어온 건은 이 화면에서 등록한 게 아니라서 삭제 대상에서 제외한다.
-  const selectableInstalls = useMemo(
-    () => filteredInstalls.filter((r) => r.source === "manual"),
-    [filteredInstalls],
-  );
+  const selectableInstalls = filteredInstalls;
 
   const toggleSelectAll = useCallback(() => {
     setSelected((prev) => {

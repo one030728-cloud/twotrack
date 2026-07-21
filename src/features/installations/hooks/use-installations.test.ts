@@ -93,20 +93,14 @@ describe("useInstallations", () => {
     expect(result.current.installs[0].source).toBe("manual");
   });
 
-  it("전체 선택은 가맹 접수 연동 건을 제외한 직접 등록 건만 선택한다", async () => {
+  it("전체 선택은 가맹 접수 연동 건을 포함해 필터링된 모든 건을 선택한다", async () => {
     const result = await setupLoaded();
 
     act(() => result.current.toggleSelectAll());
 
-    const franchiseIds = result.current.filteredInstalls
-      .filter((r) => r.source === "franchise")
-      .map((r) => r.id);
-    const manualIds = result.current.filteredInstalls
-      .filter((r) => r.source === "manual")
-      .map((r) => r.id);
+    const allIds = result.current.filteredInstalls.map((r) => r.id);
 
-    expect(manualIds.every((id) => result.current.selected[id])).toBe(true);
-    expect(franchiseIds.some((id) => result.current.selected[id])).toBe(false);
+    expect(allIds.every((id) => result.current.selected[id])).toBe(true);
     expect(result.current.allSelected).toBe(true);
   });
 
@@ -132,7 +126,7 @@ describe("useInstallations", () => {
     );
   });
 
-  it("deleteSelected는 직접 등록 건만 삭제하고 가맹 접수 연동 건은 남긴다", async () => {
+  it("deleteSelected는 가맹 접수 연동 건과 직접 등록 건을 모두 삭제한다", async () => {
     const result = await setupLoaded();
 
     const franchiseRecord = result.current.installs.find(
@@ -154,6 +148,6 @@ describe("useInstallations", () => {
     );
     expect(
       result.current.installs.some((r) => r.id === franchiseRecord.id),
-    ).toBe(true);
+    ).toBe(false);
   });
 });

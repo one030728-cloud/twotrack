@@ -207,7 +207,7 @@ describe("install handlers", () => {
     expect(updated.customerName).toBe("명동떡볶이 본점");
   });
 
-  it("DELETE /api/installs/:id는 직접 등록 건만 삭제한다", async () => {
+  it("DELETE /api/installs/:id는 가맹 접수 연동 건도 삭제한다", async () => {
     const manualDelete = await fetch("/api/installs/4", { method: "DELETE" });
     expect(manualDelete.status).toBe(204);
 
@@ -216,7 +216,12 @@ describe("install handlers", () => {
     expect(list.some((record) => record.id === 4)).toBe(false);
 
     const linkedDelete = await fetch("/api/installs/1", { method: "DELETE" });
-    expect(linkedDelete.status).toBe(403);
+    expect(linkedDelete.status).toBe(204);
+
+    const listAfterLinkedDelete = (await (
+      await fetch("/api/installs")
+    ).json()) as InstallRecord[];
+    expect(listAfterLinkedDelete.some((record) => record.id === 1)).toBe(false);
 
     const missingDelete = await fetch("/api/installs/9999", {
       method: "DELETE",
