@@ -1,8 +1,9 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { useFranchiseReceipts } from "./use-franchise-receipts";
 import { resetReceiptsForTest } from "@/mocks/handlers";
 
+beforeEach(() => resetReceiptsForTest());
 afterEach(() => resetReceiptsForTest());
 
 async function setupLoaded() {

@@ -1,8 +1,9 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { useInstallations } from "./use-installations";
 import { resetInstallsForTest } from "@/mocks/handlers";
 
+beforeEach(() => resetInstallsForTest());
 afterEach(() => resetInstallsForTest());
 
 async function setupLoaded() {

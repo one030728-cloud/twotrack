@@ -370,7 +370,13 @@ function createMemoHistory(r: RawReceipt): MemoEntry[] {
   return entries;
 }
 
+/** 실제 서비스 초기 상태. 데모용 목데이터 없이 빈 목록에서 시작한다. */
 export function createInitialReceipts(): FranchiseReceipt[] {
+  return [];
+}
+
+/** 테스트 전용 목업 픽스처. 실제 앱 초기 데이터로는 사용하지 않는다. */
+export function createFixtureReceipts(): FranchiseReceipt[] {
   const today = getLocalIsoDate();
   return RAW_RECEIPTS.map((r) => ({
     id: r.id,
@@ -394,10 +400,11 @@ export function createInitialReceipts(): FranchiseReceipt[] {
   }));
 }
 
+/** UI에서는 실시간 접수 데이터로 값을 다시 계산하므로 key/label만 사용되고 value는 참고용이다. */
 export const RECEIPT_KPIS: ReceiptKpi[] = [
-  { key: "today", label: "오늘 접수", value: 12 },
-  { key: "docWait", label: "서류 대기", value: 8 },
-  { key: "docMissing", label: "서류 미비", value: 4 },
-  { key: "review", label: "심사 대기", value: 15 },
-  { key: "doneToday", label: "오늘 완료", value: 9 },
+  { key: "today", label: "오늘 접수", value: 0 },
+  { key: "docWait", label: "서류 대기", value: 0 },
+  { key: "docMissing", label: "서류 미비", value: 0 },
+  { key: "review", label: "심사 대기", value: 0 },
+  { key: "doneToday", label: "오늘 완료", value: 0 },
 ];

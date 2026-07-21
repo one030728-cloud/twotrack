@@ -1,6 +1,7 @@
 import type { StoreRecord } from "@/features/stores/types";
 
-export const STORE_MOCKS: StoreRecord[] = [
+/** 테스트 전용 목업 픽스처. 실제 앱 초기 데이터로는 사용하지 않는다. */
+export const STORE_FIXTURES: StoreRecord[] = [
   {
     id: "store-cafe-amor",
     name: "카페 아모르",
@@ -151,3 +152,6 @@ export const STORE_MOCKS: StoreRecord[] = [
     ],
   },
 ];
+
+/** 실제 서비스 초기 상태. 데모용 목데이터 없이 빈 목록에서 시작한다. */
+export const STORE_MOCKS: StoreRecord[] = [];

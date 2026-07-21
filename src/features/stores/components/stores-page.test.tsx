@@ -1,8 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SnackbarProvider } from "@/components/ui/snackbar";
 import { StoresPage } from "./stores-page";
+
+// 실제 서비스는 빈 목록에서 시작하므로, 이 페이지의 필터링/선택 동작을 검증하기 위해
+// 테스트에서만 STORE_MOCKS 자리에 목업 픽스처를 주입한다.
+vi.mock("@/features/stores/api/mock-data", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/features/stores/api/mock-data")>();
+  return { ...actual, STORE_MOCKS: actual.STORE_FIXTURES };
+});
 
 describe("StoresPage", () => {
   function renderPage() {

@@ -7,6 +7,7 @@ import { resetInstallsForTest, resetWorkflowsForTest } from "@/mocks/handlers";
 import { AuthProvider } from "@/features/auth/auth-provider";
 
 beforeEach(() => {
+  resetInstallsForTest();
   if (!HTMLDialogElement.prototype.showModal) {
     HTMLDialogElement.prototype.showModal = function (this: HTMLDialogElement) {
       this.setAttribute("open", "");

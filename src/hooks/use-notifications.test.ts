@@ -1,8 +1,9 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
 import { useNotifications } from "./use-notifications";
 import { resetNotificationsForTest } from "@/mocks/handlers";
 
+beforeEach(() => resetNotificationsForTest());
 afterEach(() => resetNotificationsForTest());
 
 describe("useNotifications", () => {

@@ -340,7 +340,11 @@ export function StoresPage() {
         </aside>
 
         <main className="min-w-0">
-          <StoreDetail store={selectedStore} />
+          {selectedStore ? (
+            <StoreDetail store={selectedStore} />
+          ) : (
+            <EmptyState message="표시할 매장이 없습니다." />
+          )}
         </main>
       </div>
     </PageShell>

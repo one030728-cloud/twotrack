@@ -15,6 +15,8 @@ import { AUTH_STORAGE_KEY, AuthProvider } from "@/features/auth/auth-provider";
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-07-17T12:00:00+09:00"));
+  resetReceiptsForTest();
+  resetInstallsForTest();
 
   if (!HTMLDialogElement.prototype.showModal) {
     HTMLDialogElement.prototype.showModal = function (this: HTMLDialogElement) {

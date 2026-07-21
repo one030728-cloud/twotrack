@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   resetInstallsForTest,
   resetReceiptsForTest,
@@ -7,6 +7,13 @@ import {
 import type { FranchiseReceipt } from "@/features/franchise-receipts/types";
 import type { InstallRecord } from "@/features/installations/types";
 import type { ApprovalWorkflow } from "@/features/workflow/types";
+
+// 실제 서비스는 빈 목록에서 시작하므로(mock-data.ts의 createInitial*), 아래 테스트들이
+// 전제하는 목업 픽스처 상태를 매 테스트 시작 전에 명시적으로 시딩한다.
+beforeEach(() => {
+  resetReceiptsForTest();
+  resetInstallsForTest();
+});
 
 describe("MSW handlers", () => {
   it("intercepts GET /api/health", async () => {
@@ -34,9 +41,7 @@ describe("franchise-receipts handlers", () => {
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ key: "today", value: 12 }),
-      ]),
+      expect.arrayContaining([expect.objectContaining({ key: "today" })]),
     );
   });
 

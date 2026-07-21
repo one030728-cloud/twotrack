@@ -5,6 +5,7 @@ import type {
   FranchiseReceipt,
 } from "@/features/franchise-receipts/types";
 import {
+  createFixtureReceipts,
   createInitialReceipts,
   RECEIPT_KPIS,
 } from "@/features/franchise-receipts/api/mock-data";
@@ -13,7 +14,10 @@ import type {
   InstallRecord,
   PendingCompletion,
 } from "@/features/installations/types";
-import { createInitialInstalls } from "@/features/installations/api/mock-data";
+import {
+  createFixtureInstalls,
+  createInitialInstalls,
+} from "@/features/installations/api/mock-data";
 import { MOCK_USERS, type PositionCode } from "@/features/auth/permissions";
 import {
   domainForKind,
@@ -23,7 +27,8 @@ import {
   type WorkflowStage,
 } from "@/features/workflow/types";
 
-const initialNotifications: AppNotification[] = [
+/** 테스트 전용 목업 픽스처. 실제 앱 초기 데이터로는 사용하지 않는다. */
+const NOTIFICATION_FIXTURES: AppNotification[] = [
   {
     id: "1",
     message: "카페 아모르 서류 미제출 안내가 발송되었습니다.",
@@ -68,27 +73,26 @@ const initialNotifications: AppNotification[] = [
   },
 ];
 
-let notifications: AppNotification[] = initialNotifications.map((n) => ({
-  ...n,
-}));
+/** 실제 서비스 초기 상태. 데모용 목데이터 없이 빈 목록에서 시작한다. */
+let notifications: AppNotification[] = [];
 
 /** 테스트에서 mock 데이터 상태를 시드 값으로 되돌리기 위한 헬퍼. 프로덕션 코드에서는 사용하지 않는다. */
 export function resetNotificationsForTest() {
-  notifications = initialNotifications.map((n) => ({ ...n }));
+  notifications = NOTIFICATION_FIXTURES.map((n) => ({ ...n }));
 }
 
 let receipts: FranchiseReceipt[] = createInitialReceipts();
 
 /** 테스트에서 mock 데이터 상태를 시드 값으로 되돌리기 위한 헬퍼. 프로덕션 코드에서는 사용하지 않는다. */
 export function resetReceiptsForTest() {
-  receipts = createInitialReceipts();
+  receipts = createFixtureReceipts();
 }
 
 let installs: InstallRecord[] = createInitialInstalls();
 
 /** 테스트에서 mock 데이터 상태를 시드 값으로 되돌리기 위한 헬퍼. 프로덕션 코드에서는 사용하지 않는다. */
 export function resetInstallsForTest() {
-  installs = createInitialInstalls();
+  installs = createFixtureInstalls();
 }
 
 let workflows: ApprovalWorkflow[] = [];
