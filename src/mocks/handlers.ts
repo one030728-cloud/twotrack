@@ -192,10 +192,20 @@ export function resetWorkflowsForTest() {
   workflows = [];
 }
 
-let employees: EmployeeRecord[] = asArray(
-  persisted.employees,
-  createInitialEmployees,
-);
+/** 아이디/비밀번호 도입 이전(구 스키마)에 저장된 데이터는 로그인이 불가능하므로 폐기하고 시드로 되돌린다. */
+function isEmployeeRecord(value: unknown): value is EmployeeRecord {
+  return (
+    !!value &&
+    typeof value === "object" &&
+    typeof (value as EmployeeRecord).username === "string" &&
+    typeof (value as EmployeeRecord).password === "string"
+  );
+}
+
+const loadedEmployees = asArray(persisted.employees, createInitialEmployees);
+let employees: EmployeeRecord[] = loadedEmployees.every(isEmployeeRecord)
+  ? loadedEmployees
+  : createInitialEmployees();
 
 /** password는 mock 저장소 내부에만 두고 클라이언트 응답에서는 제외한다. */
 function toPublicEmployee(record: EmployeeRecord): AuthUser {
